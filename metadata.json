@@ -1,0 +1,6 @@
+{
+  "name": "HelpDesk Lite",
+  "description": "Lightweight internal support ticketing system with 5-state lifecycle engine and audit logging",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
