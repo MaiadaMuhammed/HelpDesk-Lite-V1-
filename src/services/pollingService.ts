@@ -123,6 +123,13 @@ const INCOMING_TICKET_TEMPLATES: Array<{
 
 let templateIndex = 0;
 let ticketCounter = 1045;
+let pollSequenceCounter = 0;
+
+function generatePollUniqueId(prefix: string): string {
+  pollSequenceCounter += 1;
+  const rand = Math.random().toString(36).slice(2, 8);
+  return `${prefix}_${Date.now()}_${pollSequenceCounter}_${rand}`;
+}
 
 /**
  * Executes a simulated polling cycle across current tickets.
@@ -246,7 +253,7 @@ export function simulatePollCycle(currentTickets: Ticket[]): PollResult {
         role: UserRole.REQUESTER,
       };
       newMessage = {
-        id: `msg_poll_${Date.now()}`,
+        id: generatePollUniqueId('msg_poll'),
         ticketId: activeTicket.id,
         authorId: actor.id,
         authorName: actor.name,
@@ -258,7 +265,7 @@ export function simulatePollCycle(currentTickets: Ticket[]): PollResult {
     } else {
       actor = BACKGROUND_ACTORS.marcusAgent;
       newMessage = {
-        id: `msg_poll_${Date.now()}`,
+        id: generatePollUniqueId('msg_poll'),
         ticketId: activeTicket.id,
         authorId: actor.id,
         authorName: actor.name,
@@ -273,7 +280,7 @@ export function simulatePollCycle(currentTickets: Ticket[]): PollResult {
     notifications.push(...notifs);
 
     const auditEntry: AuditLogEntry = {
-      id: `audit_poll_${Date.now()}`,
+      id: generatePollUniqueId('audit_poll'),
       ticketId: activeTicket.id,
       actorId: actor.id,
       actorName: actor.name,
@@ -283,9 +290,14 @@ export function simulatePollCycle(currentTickets: Ticket[]): PollResult {
       timestamp: now,
     };
 
+    // Ensure we do not add duplicate messages if already present
+    const existingMessages = activeTicket.messages || [];
+    const messageAlreadyPresent = existingMessages.some((m) => m.id === newMessage.id);
+    const updatedMessages = messageAlreadyPresent ? existingMessages : [...existingMessages, newMessage];
+
     const updatedTicket: Ticket = {
       ...activeTicket,
-      messages: [...activeTicket.messages, newMessage],
+      messages: updatedMessages,
       auditLogs: [...activeTicket.auditLogs, auditEntry],
       notifications: [...(activeTicket.notifications || []), ...notifs],
       updatedAt: now,
@@ -308,7 +320,7 @@ export function simulatePollCycle(currentTickets: Ticket[]): PollResult {
   const newTicketId = `HDL-${ticketCounter++}`;
 
   const requesterUser: User = {
-    id: `usr_${Date.now()}`,
+    id: generatePollUniqueId('usr'),
     name: template.requesterName,
     email: template.requesterEmail,
     role: UserRole.REQUESTER,
@@ -330,7 +342,7 @@ export function simulatePollCycle(currentTickets: Ticket[]): PollResult {
     messages: [],
     auditLogs: [
       {
-        id: `audit_create_${Date.now()}`,
+        id: generatePollUniqueId('audit_create'),
         ticketId: newTicketId,
         actorId: requesterUser.id,
         actorName: requesterUser.name,

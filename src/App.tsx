@@ -3,7 +3,7 @@
  * HDL-06 Ticket State Machine & Lifecycle Studio
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Ticket,
   TicketCategory,
@@ -13,6 +13,7 @@ import {
   UserRole,
   AuditAction,
   TicketAttachment,
+  NotificationTrigger,
 } from './types/ticket';
 import {
   mockRequester,
@@ -38,6 +39,9 @@ import {
   dispatchTicketCreatedNotification,
   dispatchManualTestNotification,
   generateSeedNotifications,
+  toggleNotificationReadStatus,
+  markAllNotificationsAsRead,
+  getUnreadNotificationCount,
 } from './services/notificationService';
 import { simulatePollCycle } from './services/pollingService';
 import { DispatchedNotification } from './types/ticket';
@@ -73,6 +77,8 @@ import {
   Radio,
   FileSpreadsheet,
   Download,
+  Bell,
+  CheckCheck,
 } from 'lucide-react';
 
 const RAW_INITIAL_SEED_TICKETS: Ticket[] = [
@@ -299,7 +305,7 @@ export default function App() {
     if (!notifs.length) return;
     const first = notifs[0];
     setToastNotification({
-      id: `toast_${Date.now()}`,
+      id: `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       count: notifs.length,
       recipientName: first.recipient.name,
       recipientEmail: first.recipient.email,
@@ -376,7 +382,7 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // Simulated Polling Mechanism (30-second interval via useEffect)
+  // Simulated Polling Mechanism (30-second interval)
   // Keeps the ticket dashboard and status live without requiring manual interaction.
   // ---------------------------------------------------------------------------
   const [isPollingEnabled, setIsPollingEnabled] = useState<boolean>(true);
@@ -385,52 +391,59 @@ export default function App() {
   const [lastPollTime, setLastPollTime] = useState<Date>(new Date());
   const [lastPollSummary, setLastPollSummary] = useState<string | null>(null);
 
+  const ticketsRef = useRef<Ticket[]>(tickets);
+  ticketsRef.current = tickets;
+  const selectedTicketIdRef = useRef<string>(selectedTicketId);
+  selectedTicketIdRef.current = selectedTicketId;
+
   const handleExecutePoll = useCallback(() => {
     setIsPollSyncing(true);
+    setLastPollTime(new Date());
+    setSecondsUntilNextPoll(30);
 
-    setTickets((currentTicketList) => {
-      const result = simulatePollCycle(currentTicketList);
-      setLastPollTime(new Date());
-      setSecondsUntilNextPoll(30);
+    const result = simulatePollCycle(ticketsRef.current);
 
-      if (result.hasUpdates && result.affectedTicket) {
-        setLastPollSummary(result.summary);
+    if (result.hasUpdates && result.affectedTicket) {
+      setLastPollSummary(result.summary);
+      setTickets(result.updatedTickets);
 
-        // If the updated ticket is currently active, refresh lifecycle state
-        if (result.affectedTicket.id === selectedTicketId) {
-          resetTicket(result.affectedTicket);
-        }
-
-        if (result.dispatchedNotifications.length > 0) {
-          triggerToastNotification(result.dispatchedNotifications);
-        }
-
-        return result.updatedTickets;
+      // If the updated ticket is currently active, refresh lifecycle state
+      if (result.affectedTicket.id === selectedTicketIdRef.current) {
+        resetTicket(result.affectedTicket);
       }
-      return currentTicketList;
-    });
+
+      if (result.dispatchedNotifications.length > 0) {
+        triggerToastNotification(result.dispatchedNotifications);
+      }
+    }
 
     setTimeout(() => {
       setIsPollSyncing(false);
     }, 500);
-  }, [selectedTicketId, resetTicket]);
+  }, [resetTicket]);
 
-  // Periodic polling useEffect hook: checks for ticket updates or status changes every 30 seconds
+  // Periodic polling countdown: purely decrements counter every second
   useEffect(() => {
     if (!isPollingEnabled) return;
 
     const timer = setInterval(() => {
       setSecondsUntilNextPoll((prev) => {
         if (prev <= 1) {
-          handleExecutePoll();
-          return 30;
+          return 0;
         }
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isPollingEnabled, handleExecutePoll]);
+  }, [isPollingEnabled]);
+
+  // Trigger poll cycle cleanly when timer reaches 0
+  useEffect(() => {
+    if (secondsUntilNextPoll === 0 && isPollingEnabled) {
+      handleExecutePoll();
+    }
+  }, [secondsUntilNextPoll, isPollingEnabled, handleExecutePoll]);
 
   const handleAddNewTicket = (newTicket: Ticket) => {
     const newNotifs = dispatchTicketCreatedNotification(newTicket, currentUser);
@@ -473,8 +486,9 @@ export default function App() {
   };
 
   const handleSendMessage = (content: string, isPrivateStaffNote: boolean) => {
+    const uniqueMessageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const newMessage = {
-      id: `msg_${Date.now()}`,
+      id: uniqueMessageId,
       ticketId: currentTicket.id,
       authorId: currentUser.id,
       authorName: currentUser.name,
@@ -523,6 +537,47 @@ export default function App() {
     );
     triggerToastNotification([testNotif]);
   };
+
+  const handleToggleNotificationRead = (notificationId: string, explicitState?: boolean) => {
+    const updatedNotifs = toggleNotificationReadStatus(
+      currentTicket.notifications || [],
+      notificationId,
+      explicitState
+    );
+    const updated: Ticket = {
+      ...currentTicket,
+      notifications: updatedNotifs,
+      updatedAt: new Date().toISOString(),
+    };
+    resetTicket(updated);
+    setTickets((prev) =>
+      prev.map((t) => (t.id === updated.id ? updated : t))
+    );
+  };
+
+  const handleMarkAllNotificationsRead = (onlyStatusAlerts: boolean = false) => {
+    const updatedNotifs = markAllNotificationsAsRead(
+      currentTicket.notifications || [],
+      onlyStatusAlerts
+    );
+    const updated: Ticket = {
+      ...currentTicket,
+      notifications: updatedNotifs,
+      updatedAt: new Date().toISOString(),
+    };
+    resetTicket(updated);
+    setTickets((prev) =>
+      prev.map((t) => (t.id === updated.id ? updated : t))
+    );
+  };
+
+  const currentTicketUnreadTotalCount = (currentTicket.notifications || []).filter(
+    (n) => !n.isRead
+  ).length;
+
+  const currentTicketUnreadStatusCount = (currentTicket.notifications || []).filter(
+    (n) => !n.isRead && n.trigger === NotificationTrigger.STATUS_CHANGED
+  ).length;
 
   // Filtered tickets
   const filteredTickets = tickets.filter((t) => {
@@ -792,6 +847,10 @@ export default function App() {
                       t.status !== TicketStatus.CLOSED &&
                       new Date(t.slaDueAt).getTime() < Date.now();
 
+                    const ticketUnreadStatusCount = (t.notifications || []).filter(
+                      (n) => !n.isRead && n.trigger === NotificationTrigger.STATUS_CHANGED
+                    ).length;
+
                     return (
                       <div
                         key={t.id}
@@ -808,6 +867,15 @@ export default function App() {
                             {t.id}
                           </span>
                           <div className="flex items-center gap-1.5">
+                            {ticketUnreadStatusCount > 0 && (
+                              <span
+                                className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-0.5 animate-pulse"
+                                title={`${ticketUnreadStatusCount} unacknowledged status alert(s)`}
+                              >
+                                <Bell className="w-2.5 h-2.5 text-amber-600" />
+                                {ticketUnreadStatusCount}
+                              </span>
+                            )}
                             {isOverdue && (
                               <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-800 animate-pulse">
                                 Overdue
@@ -887,11 +955,16 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setSubPanelView('NOTIFICATIONS')}
-                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold border border-indigo-200 transition-colors cursor-pointer"
-                        title="View Outbound Email Transparency Log"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold border border-indigo-200 transition-colors cursor-pointer"
+                        title="View Outbound Email Transparency Log & Acknowledge Status Alerts"
                       >
                         <Mail className="w-3 h-3 text-indigo-600" />
                         <span>{(currentTicket.notifications || []).length} Dispatched Emails</span>
+                        {currentTicketUnreadStatusCount > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
+                            {currentTicketUnreadStatusCount} status alert{currentTicketUnreadStatusCount === 1 ? '' : 's'} to acknowledge
+                          </span>
+                        )}
                       </button>
                       <span>•</span>
                       <button
@@ -1138,6 +1211,11 @@ export default function App() {
                     >
                       {(currentTicket.notifications || []).length}
                     </span>
+                    {currentTicketUnreadStatusCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white shadow-xs animate-pulse">
+                        {currentTicketUnreadStatusCount} new
+                      </span>
+                    )}
                   </button>
                   <button
                     type="button"
@@ -1227,6 +1305,11 @@ export default function App() {
                         <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-bold">
                           {(currentTicket.notifications || []).length}
                         </span>
+                        {currentTicketUnreadStatusCount > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
+                            {currentTicketUnreadStatusCount}
+                          </span>
+                        )}
                       </button>
                       <button
                         type="button"
@@ -1251,6 +1334,8 @@ export default function App() {
                         ticket={currentTicket}
                         currentUser={currentUser}
                         onSendTestNotification={handleSendManualTestNotification}
+                        onToggleRead={handleToggleNotificationRead}
+                        onMarkAllRead={handleMarkAllNotificationsRead}
                       />
                     ) : (
                       <AuditTrailView
@@ -1268,6 +1353,8 @@ export default function App() {
                   ticket={currentTicket}
                   currentUser={currentUser}
                   onSendTestNotification={handleSendManualTestNotification}
+                  onToggleRead={handleToggleNotificationRead}
+                  onMarkAllRead={handleMarkAllNotificationsRead}
                 />
               )}
 

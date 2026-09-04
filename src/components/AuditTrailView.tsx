@@ -52,8 +52,8 @@ export const AuditTrailView: React.FC<AuditTrailViewProps> = ({ auditLogs, onExp
             No audit records created yet.
           </div>
         ) : (
-          [...auditLogs].reverse().map((entry) => (
-            <div key={entry.id} className="p-3.5 hover:bg-slate-50/60 transition-colors">
+          [...auditLogs].reverse().map((entry, index) => (
+            <div key={`${entry.id}-${index}`} className="p-3.5 hover:bg-slate-50/60 transition-colors">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-slate-800">{entry.actorName}</span>

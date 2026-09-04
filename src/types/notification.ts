@@ -37,6 +37,8 @@ export interface DispatchedNotification {
   sentAt: string;
   deliveryStatus: DeliveryStatus;
   smtpResponseCode: string;
+  isRead?: boolean;
+  readAt?: string;
   headers: {
     messageId: string;
     to: string;

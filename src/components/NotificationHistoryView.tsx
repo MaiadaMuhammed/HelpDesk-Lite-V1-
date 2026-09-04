@@ -25,6 +25,9 @@ import {
   Inbox,
   ExternalLink,
   ShieldCheck,
+  CheckCheck,
+  AlertCircle,
+  Bell,
 } from 'lucide-react';
 
 interface NotificationHistoryViewProps {
@@ -32,6 +35,8 @@ interface NotificationHistoryViewProps {
   ticket: Ticket;
   currentUser: User;
   onSendTestNotification?: () => void;
+  onToggleRead?: (notificationId: string, explicitState?: boolean) => void;
+  onMarkAllRead?: (onlyStatusAlerts?: boolean) => void;
 }
 
 export const NotificationHistoryView: React.FC<NotificationHistoryViewProps> = ({
@@ -39,18 +44,42 @@ export const NotificationHistoryView: React.FC<NotificationHistoryViewProps> = (
   ticket,
   currentUser,
   onSendTestNotification,
+  onToggleRead,
+  onMarkAllRead,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [triggerFilter, setTriggerFilter] = useState<string>('ALL');
   const [recipientFilter, setRecipientFilter] = useState<string>('ALL');
+  const [readFilter, setReadFilter] = useState<'ALL' | 'UNREAD_STATUS' | 'UNREAD' | 'READ'>('ALL');
   const [selectedNotification, setSelectedNotification] = useState<DispatchedNotification | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [inspectorTab, setInspectorTab] = useState<'HTML' | 'PLAIN' | 'HEADERS'>('HTML');
+
+  // Unread counts
+  const unreadTotalCount = useMemo(
+    () => notifications.filter((n) => !n.isRead).length,
+    [notifications]
+  );
+  const unreadStatusCount = useMemo(
+    () => notifications.filter((n) => !n.isRead && n.trigger === NotificationTrigger.STATUS_CHANGED).length,
+    [notifications]
+  );
 
   // Filter notifications
   const filteredNotifications = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return notifications.filter((notif) => {
+      // Read state filter
+      if (readFilter === 'UNREAD_STATUS' && (notif.isRead || notif.trigger !== NotificationTrigger.STATUS_CHANGED)) {
+        return false;
+      }
+      if (readFilter === 'UNREAD' && notif.isRead) {
+        return false;
+      }
+      if (readFilter === 'READ' && !notif.isRead) {
+        return false;
+      }
+
       // Trigger filter
       if (triggerFilter !== 'ALL' && notif.trigger !== triggerFilter) {
         return false;
@@ -78,7 +107,7 @@ export const NotificationHistoryView: React.FC<NotificationHistoryViewProps> = (
       }
       return true;
     });
-  }, [notifications, searchQuery, triggerFilter, recipientFilter]);
+  }, [notifications, searchQuery, triggerFilter, recipientFilter, readFilter]);
 
   // Copy to clipboard
   const handleCopyHeaders = (notif: DispatchedNotification, e?: React.MouseEvent) => {
@@ -163,13 +192,19 @@ SMTP-Status: ${notif.smtpResponseCode}`;
             <Mail className="w-4 h-4" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-bold text-slate-900 text-sm">
                 Email Dispatch Transparency Log
               </h3>
               <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-[11px] font-bold">
                 {notifications.length} {notifications.length === 1 ? 'dispatch' : 'dispatches'}
               </span>
+              {unreadStatusCount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-[11px] font-bold animate-pulse">
+                  <AlertCircle className="w-3 h-3 text-amber-600" />
+                  {unreadStatusCount} status {unreadStatusCount === 1 ? 'alert' : 'alerts'} unacknowledged
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-500">
               Audit log of simulated outbound SMTP messages sent for status changes, assignments, and replies
@@ -177,31 +212,73 @@ SMTP-Status: ${notif.smtpResponseCode}`;
           </div>
         </div>
 
-        {/* Action button */}
-        {onSendTestNotification && (
-          <button
-            type="button"
-            onClick={onSendTestNotification}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition-colors self-start sm:self-auto shrink-0"
-            title="Simulate sending a test email dispatch for this ticket"
-          >
-            <Send className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Simulate Test Dispatch</span>
-          </button>
-        )}
+        {/* Action button group */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+          {unreadStatusCount > 0 && onMarkAllRead && (
+            <button
+              type="button"
+              id="btn-ack-all-status-alerts"
+              onClick={() => onMarkAllRead(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+              title="Acknowledge all pending status transition alerts for this ticket"
+            >
+              <CheckCheck className="w-3.5 h-3.5 text-amber-700" />
+              <span>Acknowledge Status Alerts ({unreadStatusCount})</span>
+            </button>
+          )}
+
+          {unreadTotalCount > 0 && onMarkAllRead && (
+            <button
+              type="button"
+              id="btn-mark-all-read"
+              onClick={() => onMarkAllRead(false)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+              title="Mark all notifications as read"
+            >
+              <Check className="w-3.5 h-3.5 text-slate-500" />
+              <span>Mark All Read</span>
+            </button>
+          )}
+
+          {onSendTestNotification && (
+            <button
+              type="button"
+              onClick={onSendTestNotification}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition-colors self-start sm:self-auto shrink-0 cursor-pointer"
+              title="Simulate sending a test email dispatch for this ticket"
+            >
+              <Send className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Simulate Test Dispatch</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Quick Diagnostics & Relay Banner */}
-      <div className="px-4 py-2 bg-emerald-50/50 border-b border-emerald-100/70 flex items-center justify-between text-[11px] text-emerald-800">
+      <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-700">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
           <span>
-            Simulated Relay: <strong className="font-mono">smtp-relay.company.local:587</strong> (TLS 1.3 • SPF pass • DKIM signed)
+            Simulated Relay: <strong className="font-mono text-slate-800">smtp-relay.company.local:587</strong> (TLS 1.3 • SPF pass • DKIM signed)
           </span>
         </div>
-        <span className="text-emerald-700 font-medium hidden sm:inline">
-          {notifications.length > 0 ? 'All messages delivered (250 OK)' : 'Standing by for events'}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-slate-500">
+            {unreadTotalCount === 0 ? (
+              <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                All notifications acknowledged
+              </span>
+            ) : (
+              <span className="text-slate-600 font-medium">
+                {unreadTotalCount} unread ({unreadStatusCount} status {unreadStatusCount === 1 ? 'alert' : 'alerts'})
+              </span>
+            )}
+          </span>
+          <span className="text-emerald-700 font-medium hidden sm:inline">
+            {notifications.length > 0 ? 'Delivery: 250 OK' : 'Standing by'}
+          </span>
+        </div>
       </div>
 
       {/* Search & Filter Controls */}
@@ -228,6 +305,26 @@ SMTP-Status: ${notif.smtpResponseCode}`;
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
+          </div>
+
+          {/* Read State Filter */}
+          <div className="shrink-0">
+            <select
+              id="notification-read-filter"
+              value={readFilter}
+              onChange={(e) => setReadFilter(e.target.value as any)}
+              aria-label="Filter notifications by read acknowledgement state"
+              className="bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-lg py-1.5 px-2.5 text-xs text-slate-700 font-medium focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer transition-all"
+            >
+              <option value="ALL">All Read States ({notifications.length})</option>
+              <option value="UNREAD_STATUS">
+                Unacknowledged Status Alerts ({unreadStatusCount})
+              </option>
+              <option value="UNREAD">All Unread ({unreadTotalCount})</option>
+              <option value="READ">
+                Acknowledged / Read ({notifications.length - unreadTotalCount})
+              </option>
+            </select>
           </div>
 
           {/* Trigger filter */}
@@ -265,12 +362,27 @@ SMTP-Status: ${notif.smtpResponseCode}`;
         </div>
 
         {/* Active Filter Chips */}
-        {(searchQuery || triggerFilter !== 'ALL' || recipientFilter !== 'ALL') && (
+        {(searchQuery || triggerFilter !== 'ALL' || recipientFilter !== 'ALL' || readFilter !== 'ALL') && (
           <div className="flex items-center justify-between px-2.5 py-1.5 bg-indigo-50/70 border border-indigo-100 rounded-lg text-[11px] text-indigo-900">
-            <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
               <span className="font-semibold shrink-0">
                 Showing {filteredNotifications.length} of {notifications.length} notifications
               </span>
+              {readFilter === 'UNREAD_STATUS' && (
+                <span className="bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded font-semibold">
+                  Status alerts unacknowledged
+                </span>
+              )}
+              {readFilter === 'UNREAD' && (
+                <span className="bg-indigo-100 text-indigo-900 border border-indigo-300 px-1.5 py-0.2 rounded font-semibold">
+                  Unread only
+                </span>
+              )}
+              {readFilter === 'READ' && (
+                <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 px-1.5 py-0.2 rounded font-semibold">
+                  Acknowledged only
+                </span>
+              )}
               {searchQuery && (
                 <span className="text-indigo-600 truncate max-w-[200px]" title={searchQuery}>
                   matching &ldquo;{searchQuery}&rdquo;
@@ -283,8 +395,9 @@ SMTP-Status: ${notif.smtpResponseCode}`;
                 setSearchQuery('');
                 setTriggerFilter('ALL');
                 setRecipientFilter('ALL');
+                setReadFilter('ALL');
               }}
-              className="font-medium text-indigo-700 hover:text-indigo-950 underline shrink-0 ml-2"
+              className="font-medium text-indigo-700 hover:text-indigo-950 underline shrink-0 ml-2 cursor-pointer"
             >
               Reset filters
             </button>
@@ -333,110 +446,198 @@ SMTP-Status: ${notif.smtpResponseCode}`;
             </button>
           </div>
         ) : (
-          filteredNotifications.map((notif) => (
-            <div
-              key={notif.id}
-              className="p-3.5 hover:bg-slate-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-            >
-              <div className="flex items-start gap-3 min-w-0 flex-1">
-                {/* Event Type Icon Indicator */}
-                <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5">
-                  {getTriggerIcon(notif.trigger)}
-                </div>
+          filteredNotifications.map((notif, index) => {
+            const isUnread = !notif.isRead;
+            const isStatusAlert = notif.trigger === NotificationTrigger.STATUS_CHANGED;
 
-                <div className="min-w-0 flex-1 space-y-1">
-                  {/* Top Bar: Trigger badge, Recipient pill & Timestamp */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {getTriggerBadge(notif.trigger)}
+            return (
+              <div
+                key={`${notif.id}-${index}`}
+                className={`p-3.5 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                  isUnread
+                    ? isStatusAlert
+                      ? 'bg-amber-50/40 hover:bg-amber-50/70 border-l-4 border-l-amber-500'
+                      : 'bg-indigo-50/30 hover:bg-indigo-50/60 border-l-4 border-l-indigo-500'
+                    : 'hover:bg-slate-50/80 border-l-4 border-l-transparent'
+                }`}
+              >
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  {/* Event Type Icon Indicator */}
+                  <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${
+                    isUnread && isStatusAlert
+                      ? 'bg-amber-100 border-amber-300'
+                      : isUnread
+                      ? 'bg-indigo-100 border-indigo-300'
+                      : 'bg-slate-100 border-slate-200'
+                  }`}>
+                    {getTriggerIcon(notif.trigger)}
+                  </div>
 
-                    {/* Recipient tag */}
-                    <div className="inline-flex items-center gap-1 text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      <span className="font-semibold text-slate-800">{notif.recipient.name}</span>
-                      <span className="text-slate-400">&lt;{notif.recipient.email}&gt;</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider bg-white px-1 py-0.2 rounded border border-slate-200 text-indigo-700 ml-0.5">
-                        {notif.recipient.role}
-                      </span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    {/* Top Bar: Trigger badge, Acknowledgement badge, Recipient pill & Timestamp */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {getTriggerBadge(notif.trigger)}
+
+                      {/* Acknowledgement / Read Badge */}
+                      {isUnread ? (
+                        isStatusAlert ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300 shadow-2xs">
+                            <AlertCircle className="w-3 h-3 text-amber-600 animate-pulse" />
+                            <span>Unacknowledged Status Alert</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-900 bg-indigo-100 px-2 py-0.5 rounded border border-indigo-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
+                            <span>Unread Alert</span>
+                          </span>
+                        )
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+                          title={notif.readAt ? `Acknowledged at ${new Date(notif.readAt).toLocaleString()}` : 'Acknowledged'}
+                        >
+                          <Check className="w-2.5 h-2.5 text-emerald-600" />
+                          <span>Acknowledged</span>
+                          {notif.readAt && (
+                            <span className="text-slate-400 font-mono text-[9px] hidden sm:inline">
+                              {new Date(notif.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </span>
+                      )}
+
+                      {/* Recipient tag */}
+                      <div className="inline-flex items-center gap-1 text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        <span className="font-semibold text-slate-800">{notif.recipient.name}</span>
+                        <span className="text-slate-400">&lt;{notif.recipient.email}&gt;</span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-white px-1 py-0.2 rounded border border-slate-200 text-indigo-700 ml-0.5">
+                          {notif.recipient.role}
+                        </span>
+                      </div>
+
+                      {/* Sent time */}
+                      <div className="flex items-center gap-1 text-[11px] text-slate-400 ml-auto sm:ml-0">
+                        <Clock className="w-3 h-3" />
+                        <span title={new Date(notif.sentAt).toLocaleString()}>
+                          {new Date(notif.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Sent time */}
-                    <div className="flex items-center gap-1 text-[11px] text-slate-400 ml-auto sm:ml-0">
-                      <Clock className="w-3 h-3" />
-                      <span title={new Date(notif.sentAt).toLocaleString()}>
-                        {new Date(notif.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    {/* Subject line */}
+                    <p className={`font-semibold truncate ${isUnread ? 'text-slate-900 font-bold' : 'text-slate-700'}`}>
+                      {notif.subject}
+                    </p>
+
+                    {/* Preview excerpt */}
+                    <p className="text-slate-500 text-[11px] line-clamp-1">
+                      {notif.previewText}
+                    </p>
+
+                    {/* Relay Status metadata */}
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono pt-0.5">
+                      <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 font-sans font-bold">
+                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                        Delivered (250 OK)
+                      </span>
+                      <span className="truncate max-w-[280px]">
+                        ID: {notif.headers.messageId}
                       </span>
                     </div>
                   </div>
-
-                  {/* Subject line */}
-                  <p className="font-semibold text-slate-900 truncate">
-                    {notif.subject}
-                  </p>
-
-                  {/* Preview excerpt */}
-                  <p className="text-slate-500 text-[11px] line-clamp-1">
-                    {notif.previewText}
-                  </p>
-
-                  {/* Relay Status metadata */}
-                  <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono pt-0.5">
-                    <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 font-sans font-bold">
-                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                      Delivered (250 OK)
-                    </span>
-                    <span className="truncate max-w-[280px]">
-                      ID: {notif.headers.messageId}
-                    </span>
-                  </div>
                 </div>
-              </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-                <button
-                  type="button"
-                  onClick={() => handleCopyHeaders(notif)}
-                  className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1"
-                  title="Copy email headers & SMTP envelope"
-                >
-                  {copiedId === notif.id ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-600" />
-                      <span className="text-emerald-700">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3 text-slate-500" />
-                      <span>Headers</span>
-                    </>
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center flex-wrap">
+                  {/* Mark as Read / Toggle Acknowledged Button */}
+                  {onToggleRead && (
+                    <button
+                      type="button"
+                      id={`btn-ack-${notif.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleRead(notif.id, !notif.isRead);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1 cursor-pointer ${
+                        isUnread
+                          ? isStatusAlert
+                            ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                            : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                      }`}
+                      title={
+                        isUnread
+                          ? isStatusAlert
+                            ? 'Acknowledge this status change alert'
+                            : 'Mark this notification alert as read'
+                          : 'Mark alert as unread / unacknowledged'
+                      }
+                    >
+                      {isUnread ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>{isStatusAlert ? 'Acknowledge' : 'Mark Read'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCheck className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Mark Unread</span>
+                        </>
+                      )}
+                    </button>
                   )}
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedNotification(notif);
-                    setInspectorTab('HTML');
-                  }}
-                  className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1"
-                  title="Inspect full HTML email preview"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Inspect Email</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyHeaders(notif)}
+                    className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Copy email headers & SMTP envelope"
+                  >
+                    {copiedId === notif.id ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-600" />
+                        <span className="text-emerald-700">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 text-slate-500" />
+                        <span>Headers</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedNotification(notif);
+                      setInspectorTab('HTML');
+                      if (!notif.isRead && onToggleRead) {
+                        onToggleRead(notif.id, true);
+                      }
+                    }}
+                    className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Inspect full HTML email preview (automatically acknowledges alert)"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Inspect</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
       {/* Footer Info */}
       <div className="p-3 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <span>
-          Automated notifications ensure stakeholder transparency without manual email writing.
+          Automated notifications ensure stakeholder transparency without manual email writing. Agents can acknowledge alerts to track reviewed updates.
         </span>
-        <span className="font-mono text-[10px] text-slate-400">
-          Total Outbound: {notifications.length} envelopes
-        </span>
+        <div className="flex items-center gap-3 font-mono text-[10px] text-slate-400">
+          <span>Unacknowledged: {unreadTotalCount}</span>
+          <span>•</span>
+          <span>Total Outbound: {notifications.length} envelopes</span>
+        </div>
       </div>
 
       {/* Email Inspector Modal */}
@@ -456,22 +657,68 @@ SMTP-Status: ${notif.smtpResponseCode}`;
                   <Mail className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className="font-bold text-slate-900 text-sm truncate">
-                    Simulated Email Inspector
-                  </h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-slate-900 text-sm truncate">
+                      Simulated Email Inspector
+                    </h4>
+                    {selectedNotification.isRead ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-600" />
+                        Acknowledged
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 text-amber-600" />
+                        Unacknowledged Alert
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-500 truncate">
                     Subject: {selectedNotification.subject}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setSelectedNotification(null)}
-                className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                {onToggleRead && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextState = !selectedNotification.isRead;
+                      onToggleRead(selectedNotification.id, nextState);
+                      setSelectedNotification({
+                        ...selectedNotification,
+                        isRead: nextState,
+                        readAt: nextState ? new Date().toISOString() : undefined,
+                      });
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer border ${
+                      selectedNotification.isRead
+                        ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                        : 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600 shadow-xs'
+                    }`}
+                  >
+                    {selectedNotification.isRead ? (
+                      <>
+                        <CheckCheck className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Mark Unread</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Acknowledge</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedNotification(null)}
+                  className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Email Envelope Summary Header */}
@@ -616,10 +863,41 @@ Content-Transfer-Encoding: 7bit
               </span>
 
               <div className="flex items-center gap-2">
+                {onToggleRead && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextState = !selectedNotification.isRead;
+                      onToggleRead(selectedNotification.id, nextState);
+                      setSelectedNotification({
+                        ...selectedNotification,
+                        isRead: nextState,
+                        readAt: nextState ? new Date().toISOString() : undefined,
+                      });
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer border ${
+                      selectedNotification.isRead
+                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                        : 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                    }`}
+                  >
+                    {selectedNotification.isRead ? (
+                      <>
+                        <CheckCheck className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Mark Unread</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Acknowledge</span>
+                      </>
+                    )}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleCopyHeaders(selectedNotification)}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <Copy className="w-3.5 h-3.5 text-slate-500" />
                   <span>{copiedId === selectedNotification.id ? 'Copied!' : 'Copy Headers'}</span>
@@ -627,7 +905,7 @@ Content-Transfer-Encoding: 7bit
                 <button
                   type="button"
                   onClick={() => setSelectedNotification(null)}
-                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors"
+                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Close
                 </button>

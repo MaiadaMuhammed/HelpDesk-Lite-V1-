@@ -255,6 +255,8 @@ function createNotificationRecord(params: {
     sentAt: now,
     deliveryStatus: DeliveryStatus.DELIVERED,
     smtpResponseCode: '250 2.0.0 OK: 14389 bytes queued via relay.company.local',
+    isRead: false,
+    readAt: undefined,
     headers: {
       messageId,
       to: `${params.recipient.name} <${params.recipient.email}>`,
@@ -909,6 +911,8 @@ export function generateSeedNotifications(ticket: Ticket): DispatchedNotificatio
     sentAt: new Date(baseTime).toISOString(),
     deliveryStatus: DeliveryStatus.DELIVERED,
     smtpResponseCode: '250 2.0.0 OK: message queued 1042-relay.company.local',
+    isRead: true,
+    readAt: new Date(baseTime + 300000).toISOString(),
     headers: {
       messageId: `<${ticket.id.toLowerCase()}.${baseTime}.ack@${SYSTEM_REPLY_DOMAIN}>`,
       to: `${ticket.requesterName} <${ticket.requesterEmail}>`,
@@ -970,6 +974,8 @@ export function generateSeedNotifications(ticket: Ticket): DispatchedNotificatio
       sentAt: new Date(assignTime).toISOString(),
       deliveryStatus: DeliveryStatus.DELIVERED,
       smtpResponseCode: '250 2.0.0 OK: message queued 1042-relay.company.local',
+      isRead: false,
+      readAt: undefined,
       headers: {
         messageId: `<${ticket.id.toLowerCase()}.${assignTime}.asg@${SYSTEM_REPLY_DOMAIN}>`,
         to: `${ticket.assignedToName} <${ticket.assignedToName.toLowerCase().replace(/\s+/g, '.')}@company.local>`,
@@ -1060,4 +1066,65 @@ export function dispatchManualTestNotification(
     },
   });
 }
+
+// -----------------------------------------------------------------------------
+// Read Status & Acknowledgement Tracking Helpers
+// -----------------------------------------------------------------------------
+
+/**
+ * Toggles or explicitly sets the read/acknowledged status for a specific notification.
+ */
+export function toggleNotificationReadStatus(
+  notifications: DispatchedNotification[],
+  notificationId: string,
+  explicitState?: boolean
+): DispatchedNotification[] {
+  const now = new Date().toISOString();
+  return notifications.map((notif) => {
+    if (notif.id !== notificationId) return notif;
+    const targetState = explicitState !== undefined ? explicitState : !notif.isRead;
+    return {
+      ...notif,
+      isRead: targetState,
+      readAt: targetState ? (notif.readAt || now) : undefined,
+    };
+  });
+}
+
+/**
+ * Marks all notifications (or optionally only status change alerts) as read/acknowledged.
+ */
+export function markAllNotificationsAsRead(
+  notifications: DispatchedNotification[],
+  onlyStatusAlerts: boolean = false
+): DispatchedNotification[] {
+  const now = new Date().toISOString();
+  return notifications.map((notif) => {
+    if (onlyStatusAlerts && notif.trigger !== NotificationTrigger.STATUS_CHANGED) {
+      return notif;
+    }
+    return {
+      ...notif,
+      isRead: true,
+      readAt: notif.readAt || now,
+    };
+  });
+}
+
+/**
+ * Counts unread notifications, optionally scoped to status change alerts.
+ */
+export function getUnreadNotificationCount(
+  notifications: DispatchedNotification[] = [],
+  onlyStatusAlerts: boolean = false
+): number {
+  return notifications.filter((notif) => {
+    if (notif.isRead) return false;
+    if (onlyStatusAlerts) {
+      return notif.trigger === NotificationTrigger.STATUS_CHANGED;
+    }
+    return true;
+  }).length;
+}
+
 

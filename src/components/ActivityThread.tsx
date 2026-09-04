@@ -87,12 +87,12 @@ export const ActivityThread: React.FC<ActivityThreadProps> = ({
             No replies or notes recorded on this ticket yet.
           </div>
         ) : (
-          visibleMessages.map((msg) => {
+          visibleMessages.map((msg, index) => {
             const isSelf = msg.authorId === currentUser.id;
 
             return (
               <div
-                key={msg.id}
+                key={`${msg.id}-${index}`}
                 className={`p-3.5 rounded-xl text-xs transition-all ${
                   msg.isPrivateStaffNote
                     ? 'bg-amber-50/80 border border-amber-200/90 text-amber-950'
