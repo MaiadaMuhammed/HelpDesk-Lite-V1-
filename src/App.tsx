@@ -82,7 +82,17 @@ import {
   CheckCheck,
   LogOut,
   User as UserIcon,
+  Zap,
+  Copy,
+  Check,
+  Timer,
+  ArrowUpRight,
 } from 'lucide-react';
+import {
+  getSlaCalculation,
+  QueueViewPreset,
+  filterByQueuePreset,
+} from './utils/smartHelpers';
 import { AuthGateway } from './components/AuthGateway';
 import {
   UserProfile,
@@ -336,7 +346,10 @@ export default function App() {
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
+  const [queuePreset, setQueuePreset] = useState<QueueViewPreset>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'STUDIO' | 'TEST_SUITE' | 'DOCS'>('STUDIO');
@@ -351,6 +364,31 @@ export default function App() {
     subject: string;
     trigger: string;
   } | null>(null);
+
+  // Keyboard shortcut: Press '/' or 'Cmd+K' to focus the search bar from anywhere
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key === 'k')) &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA'
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleCopyTicketSummary = (ticket: Ticket) => {
+    const summary = `[${ticket.id}] ${ticket.title} (Status: ${ticket.status}, Priority: ${ticket.priority})`;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(summary);
+      setCopyFeedback(`Copied ${ticket.id}`);
+      setTimeout(() => setCopyFeedback(null), 2500);
+    }
+  };
 
   const activeTicket = tickets.find((t) => t.id === selectedTicketId) || tickets[0];
 
@@ -651,8 +689,29 @@ export default function App() {
     mockAgentTwo,
   ].filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i);
 
-  // Filtered tickets
-  const filteredTickets = tickets.filter((t) => {
+  // Smart Preset Counts
+  const allCount = tickets.length;
+  const myTicketsCount = tickets.filter((t) =>
+    effectiveUser.role === UserRole.REQUESTER
+      ? t.requesterId === effectiveUser.id || t.requesterEmail.toLowerCase() === effectiveUser.email.toLowerCase()
+      : t.assignedToId === effectiveUser.id
+  ).length;
+  const unassignedCount = tickets.filter(
+    (t) => t.status === TicketStatus.NEW || (!t.assignedToId && t.status !== TicketStatus.CLOSED)
+  ).length;
+  const urgentCount = tickets.filter((t) => {
+    const isCritical = t.priority === TicketPriority.CRITICAL || (t.priority as string) === 'URGENT';
+    const isOverdue =
+      t.status !== TicketStatus.RESOLVED &&
+      t.status !== TicketStatus.CLOSED &&
+      new Date(t.slaDueAt).getTime() < Date.now();
+    return isCritical || isOverdue;
+  }).length;
+
+  // Filtered tickets with Smart Preset & compound filters
+  const presetTickets = filterByQueuePreset(tickets, queuePreset, effectiveUser);
+
+  const filteredTickets = presetTickets.filter((t) => {
     if (categoryFilter !== 'ALL' && t.category !== categoryFilter) return false;
     if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
     if (priorityFilter !== 'ALL') {
@@ -668,7 +727,9 @@ export default function App() {
       const q = searchQuery.toLowerCase().trim();
       const matchId = t.id.toLowerCase().includes(q);
       const matchTitle = t.title.toLowerCase().includes(q);
-      if (!matchId && !matchTitle) {
+      const matchRequester = t.requesterName.toLowerCase().includes(q);
+      const matchAssignee = (t.assignedToName || '').toLowerCase().includes(q);
+      if (!matchId && !matchTitle && !matchRequester && !matchAssignee) {
         return false;
       }
     }
@@ -940,12 +1001,13 @@ export default function App() {
                       <span>Ticket Queue</span>
                     </span>
                     <div className="flex items-center gap-2">
-                      {(searchQuery.trim() || priorityFilter !== 'ALL' || categoryFilter !== 'ALL' || statusFilter !== 'ALL') && (
+                      {(searchQuery.trim() || priorityFilter !== 'ALL' || categoryFilter !== 'ALL' || statusFilter !== 'ALL' || queuePreset !== 'ALL') && (
                         <button
                           type="button"
                           id="btn-clear-filters"
                           onClick={() => {
                             setSearchQuery('');
+                            setQueuePreset('ALL');
                             setPriorityFilter('ALL');
                             setCategoryFilter('ALL');
                             setStatusFilter('ALL');
@@ -962,31 +1024,103 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Real-Time Search Field (Title & ID) */}
+                  {/* Smart Queue Presets */}
+                  <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-100/90 rounded-lg text-[10px] font-medium">
+                    <button
+                      type="button"
+                      id="preset-all"
+                      onClick={() => setQueuePreset('ALL')}
+                      className={`py-1 px-1 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        queuePreset === 'ALL'
+                          ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      title="All active tickets in the queue"
+                    >
+                      <span>All</span>
+                      <span className="font-mono text-[9px] text-slate-400">({allCount})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="preset-my-tickets"
+                      onClick={() => setQueuePreset('MY_TICKETS')}
+                      className={`py-1 px-1 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        queuePreset === 'MY_TICKETS'
+                          ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      title={effectiveUser.role === UserRole.REQUESTER ? 'Tickets requested by you' : 'Tickets assigned to you'}
+                    >
+                      <span>{effectiveUser.role === UserRole.REQUESTER ? 'Mine' : 'Assigned'}</span>
+                      <span className="font-mono text-[9px] text-slate-400">({myTicketsCount})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="preset-unassigned"
+                      onClick={() => setQueuePreset('UNASSIGNED')}
+                      className={`py-1 px-1 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        queuePreset === 'UNASSIGNED'
+                          ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      title="Unassigned tickets awaiting agent triage or claim"
+                    >
+                      <span>Triage</span>
+                      <span className="font-mono text-[9px] text-slate-400">({unassignedCount})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="preset-urgent"
+                      onClick={() => setQueuePreset('URGENT')}
+                      className={`py-1 px-1 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        queuePreset === 'URGENT'
+                          ? 'bg-white text-rose-700 shadow-2xs font-semibold'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      title="Tickets with critical priority or overdue SLA"
+                    >
+                      <span>Urgent</span>
+                      <span className={`font-mono text-[9px] ${urgentCount > 0 ? 'text-rose-600 font-semibold' : 'text-slate-400'}`}>
+                        ({urgentCount})
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Real-Time Search Field (Title, ID, Requester, Assignee) */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
                       <Search className="w-3.5 h-3.5" />
                     </div>
                     <input
+                      ref={searchInputRef}
                       id="input-ticket-search"
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search by title or ID (e.g. HDL-1042)..."
-                      className="w-full bg-slate-50 border border-slate-200/80 rounded-md pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:bg-white transition-colors"
+                      placeholder="Search ID, title, requester... (Press /)"
+                      className="w-full bg-slate-50 border border-slate-200/80 rounded-md pl-8 pr-12 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:bg-white transition-colors"
                       autoComplete="off"
                     />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        id="btn-clear-search"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                        title="Clear search"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    <div className="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
+                      {searchQuery ? (
+                        <button
+                          type="button"
+                          id="btn-clear-search"
+                          onClick={() => setSearchQuery('')}
+                          className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                          title="Clear search"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <kbd className="hidden sm:inline-block text-[10px] text-slate-400 bg-slate-200/60 px-1.5 py-0.2 rounded font-mono border border-slate-300/60 pointer-events-none">
+                          /
+                        </kbd>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-2 text-[11px]">
@@ -1061,10 +1195,7 @@ export default function App() {
                 <div className="divide-y divide-slate-100 max-h-[520px] overflow-y-auto">
                   {filteredTickets.map((t) => {
                     const isSelected = t.id === currentTicket.id;
-                    const isOverdue =
-                      t.status !== TicketStatus.RESOLVED &&
-                      t.status !== TicketStatus.CLOSED &&
-                      new Date(t.slaDueAt).getTime() < Date.now();
+                    const sla = getSlaCalculation(t);
 
                     const ticketUnreadStatusCount = (t.notifications || []).filter(
                       (n) => !n.isRead && n.trigger === NotificationTrigger.STATUS_CHANGED
@@ -1082,9 +1213,15 @@ export default function App() {
                         }`}
                       >
                         <div className="flex items-center justify-between gap-1 mb-1">
-                          <span className="font-mono font-semibold text-slate-700">
-                            {t.id}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-semibold text-slate-700">
+                              {t.id}
+                            </span>
+                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-medium border ${sla.badgeClass}`}>
+                              {sla.shortLabel}
+                            </span>
+                          </div>
+
                           <div className="flex items-center gap-1.5">
                             {ticketUnreadStatusCount > 0 && (
                               <span
@@ -1093,11 +1230,6 @@ export default function App() {
                               >
                                 <Bell className="w-2.5 h-2.5 text-amber-600" />
                                 {ticketUnreadStatusCount}
-                              </span>
-                            )}
-                            {isOverdue && (
-                              <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-rose-50 text-rose-700 border border-rose-200/60">
-                                Overdue
                               </span>
                             )}
                             <span
@@ -1118,16 +1250,19 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="font-medium text-slate-800 line-clamp-1">
+                        <div className="font-medium text-slate-800 line-clamp-1 mb-1">
                           {t.title}
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5">
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                              {t.category}
+                            <span
+                              className="w-4 h-4 rounded-full bg-slate-200 text-slate-700 text-[9px] font-semibold flex items-center justify-center shrink-0"
+                              title={`Requester: ${t.requesterName}`}
+                            >
+                              {t.requesterName.charAt(0)}
                             </span>
+                            <span>{t.category}</span>
                             <span className="text-slate-300">•</span>
                             <span
                               className={`font-medium ${
@@ -1149,7 +1284,7 @@ export default function App() {
                                 : 'Low'}
                             </span>
                           </div>
-                          <span>
+                          <span className="truncate max-w-[90px]" title={t.assignedToName || 'Unassigned'}>
                             {t.assignedToName ? t.assignedToName : 'Unassigned'}
                           </span>
                         </div>
@@ -1163,21 +1298,24 @@ export default function App() {
                       <p className="text-xs font-medium text-slate-700">No matching tickets</p>
                       <p className="text-[11px] text-slate-400">
                         {searchQuery.trim()
-                          ? `No tickets match "${searchQuery}" with the current filter criteria.`
-                          : 'No tickets match the selected priority or filter criteria.'}
+                          ? `No tickets match "${searchQuery}" with the current criteria.`
+                          : queuePreset !== 'ALL'
+                          ? `No tickets in the "${queuePreset}" view with active filters.`
+                          : 'No tickets match the selected filter criteria.'}
                       </p>
                       <button
                         type="button"
                         id="btn-reset-filters-empty"
                         onClick={() => {
                           setSearchQuery('');
+                          setQueuePreset('ALL');
                           setPriorityFilter('ALL');
                           setCategoryFilter('ALL');
                           setStatusFilter('ALL');
                         }}
                         className="text-xs text-slate-800 hover:text-slate-900 font-medium underline cursor-pointer"
                       >
-                        Reset search & filters
+                        Reset view & filters
                       </button>
                     </div>
                   )}
@@ -1188,112 +1326,190 @@ export default function App() {
             {/* Right Panel: State Machine Inspector & Active Ticket Details */}
             <div className="lg:col-span-8 space-y-6">
               {/* Ticket Header & Single-Agent Manual Assignment */}
-              <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs">
-                <div className="flex flex-wrap items-start justify-between gap-3 pb-4 border-b border-slate-100">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="font-mono text-xs font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/80">
-                        {currentTicket.id}
-                      </span>
-                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-50 text-slate-600 border border-slate-200/60">
-                        {currentTicket.category}
-                      </span>
-                      <span
-                        className={`text-xs font-medium px-2 py-0.5 rounded ${
-                          currentTicket.priority === TicketPriority.CRITICAL
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                            : currentTicket.priority === TicketPriority.HIGH
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                            : 'bg-slate-50 text-slate-600 border border-slate-200/60'
-                        }`}
-                      >
-                        {currentTicket.priority} Priority
-                      </span>
-                    </div>
-                    <h1 className="text-base font-semibold text-slate-900 leading-snug">
-                      {currentTicket.title}
-                    </h1>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1.5">
-                      <span>Requester: <strong className="text-slate-700 font-medium">{currentTicket.requesterName}</strong></span>
-                      <span className="text-slate-300">•</span>
-                      <span>SLA: <strong className="text-slate-700 font-medium">{new Date(currentTicket.slaDueAt).toLocaleDateString()} {new Date(currentTicket.slaDueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
-                      <span className="text-slate-300">•</span>
-                      <button
-                        type="button"
-                        onClick={() => setSubPanelView('NOTIFICATIONS')}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium border border-slate-200 transition-colors cursor-pointer"
-                        title="View Outbound Email Transparency Log & Acknowledge Status Alerts"
-                      >
-                        <Mail className="w-3 h-3 text-slate-500" />
-                        <span>{(currentTicket.notifications || []).length} Emails</span>
-                        {currentTicketUnreadStatusCount > 0 && (
-                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-amber-500 text-white">
-                            {currentTicketUnreadStatusCount} new
+              {(() => {
+                const currentSla = getSlaCalculation(currentTicket);
+                return (
+                  <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs">
+                    <div className="flex flex-wrap items-start justify-between gap-3 pb-4 border-b border-slate-100">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <span className="font-mono text-xs font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/80">
+                            {currentTicket.id}
                           </span>
+                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-50 text-slate-600 border border-slate-200/60">
+                            {currentTicket.category}
+                          </span>
+                          <span
+                            className={`text-xs font-medium px-2 py-0.5 rounded ${
+                              currentTicket.priority === TicketPriority.CRITICAL
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                                : currentTicket.priority === TicketPriority.HIGH
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                : 'bg-slate-50 text-slate-600 border border-slate-200/60'
+                            }`}
+                          >
+                            {currentTicket.priority === TicketPriority.CRITICAL ? 'Urgent' : currentTicket.priority} Priority
+                          </span>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded border ${currentSla.badgeClass}`}>
+                            {currentSla.shortLabel}
+                          </span>
+                        </div>
+                        <h1 className="text-base font-semibold text-slate-900 leading-snug">
+                          {currentTicket.title}
+                        </h1>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1.5">
+                          <span>Requester: <strong className="text-slate-700 font-medium">{currentTicket.requesterName}</strong></span>
+                          <span className="text-slate-300">•</span>
+                          <span>SLA Due: <strong className="text-slate-700 font-medium">{new Date(currentTicket.slaDueAt).toLocaleDateString()} {new Date(currentTicket.slaDueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
+                          <span className="text-slate-300">•</span>
+                          <button
+                            type="button"
+                            onClick={() => setSubPanelView('NOTIFICATIONS')}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium border border-slate-200 transition-colors cursor-pointer"
+                            title="View Outbound Email Transparency Log & Acknowledge Status Alerts"
+                          >
+                            <Mail className="w-3 h-3 text-slate-500" />
+                            <span>{(currentTicket.notifications || []).length} Emails</span>
+                            {currentTicketUnreadStatusCount > 0 && (
+                              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-amber-500 text-white">
+                                {currentTicketUnreadStatusCount} new
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex items-center gap-1.5 w-full">
+                          <button
+                            type="button"
+                            id="btn-copy-ticket-summary"
+                            onClick={() => handleCopyTicketSummary(currentTicket)}
+                            className="flex-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                            title="Copy ticket ID and title to clipboard"
+                          >
+                            {copyFeedback ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                <span className="text-emerald-700 font-semibold">{copyFeedback}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Copy Info</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            id="btn-quick-export-csv"
+                            onClick={() => setIsExportModalOpen(true)}
+                            className="flex-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                            title="Export ticket activity & audit logs to CSV"
+                          >
+                            <Download className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Export CSV</span>
+                          </button>
+                        </div>
+
+                        {/* Quick Claim Action for Agents/Managers */}
+                        {(!currentTicket.assignedToId || currentTicket.assignedToId !== currentUser.id) &&
+                          currentTicket.status !== TicketStatus.CLOSED &&
+                          (currentUser.role === UserRole.AGENT || currentUser.role === UserRole.MANAGER) && (
+                            <button
+                              type="button"
+                              id="btn-quick-claim"
+                              onClick={() => {
+                                assignToAgent({ id: currentUser.id, name: currentUser.name }, 'Claimed via 1-click action');
+                                if (currentTicket.status === TicketStatus.NEW) {
+                                  transitionTo(TicketStatus.ASSIGNED, { reason: `Auto-assigned on claim by ${currentUser.name}` });
+                                }
+                              }}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/70 text-indigo-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                              title="Instantly claim and assign this ticket to yourself"
+                            >
+                              <Zap className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>{currentTicket.assignedToId ? 'Reassign to Me' : 'Claim Ticket'}</span>
+                            </button>
                         )}
-                      </button>
+
+                        {/* Single-Agent Assignment Widget */}
+                        <div className="bg-slate-50/70 border border-slate-200/80 rounded-lg p-2.5 text-xs min-w-[200px] w-full">
+                          <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wide flex items-center gap-1.5 mb-1">
+                            <UserCheck className="w-3 h-3 text-slate-500" />
+                            <span>Assignee</span>
+                          </div>
+
+                        {currentTicket.status === TicketStatus.CLOSED ? (
+                          <div className="text-slate-500 font-medium">
+                            {currentTicket.assignedToName || 'Unassigned (Closed)'}
+                          </div>
+                        ) : currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.AGENT ? (
+                          <select
+                            value={currentTicket.assignedToId || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (!val) {
+                                assignToAgent(null, 'Unassigned ticket back to pool');
+                              } else {
+                                const selectedAgent = availableSupportAgents.find((a) => a.id === val);
+                                if (selectedAgent) {
+                                  assignToAgent({ id: selectedAgent.id, name: selectedAgent.name });
+                                }
+                              }
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded-md p-1 font-medium text-slate-800 focus:outline-none focus:border-slate-800 cursor-pointer text-xs"
+                          >
+                            <option value="">-- Unassigned (Triage Pool) --</option>
+                            {availableSupportAgents.map((agt) => (
+                              <option key={agt.id} value={agt.id}>
+                                {agt.name} ({agt.role === UserRole.AGENT ? 'Support' : agt.role})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="font-semibold text-slate-800">
+                            {currentTicket.assignedToName || 'Unassigned (In Triage)'}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-2">
-                    <button
-                      type="button"
-                      id="btn-quick-export-csv"
-                      onClick={() => setIsExportModalOpen(true)}
-                      className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer w-full justify-center"
-                      title="Export ticket activity & audit logs to CSV"
-                    >
-                      <Download className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Export CSV</span>
-                    </button>
+                  {/* Smart SLA Urgency & Health Tracker */}
+                  <div className="mt-3 p-2.5 rounded-lg bg-slate-50/80 border border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Timer className={`w-3.5 h-3.5 ${currentSla.isBreached ? 'text-rose-500' : currentSla.isNearBreach ? 'text-amber-500' : 'text-emerald-500'}`} />
+                      <span className="text-slate-600 font-medium">SLA Resolution Target:</span>
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${currentSla.badgeClass}`}>
+                        {currentSla.label}
+                      </span>
+                    </div>
 
-                    {/* Single-Agent Assignment Widget */}
-                    <div className="bg-slate-50/70 border border-slate-200/80 rounded-lg p-2.5 text-xs min-w-[200px] w-full">
-                      <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wide flex items-center gap-1.5 mb-1">
-                        <UserCheck className="w-3 h-3 text-slate-500" />
-                        <span>Assignee</span>
+                    <div className="flex items-center gap-2 min-w-[150px]">
+                      <span className="text-[10px] text-slate-400 font-mono">{currentSla.progressPercent}% elapsed</span>
+                      <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden w-24">
+                        <div
+                          className={`h-full transition-all ${
+                            currentSla.isBreached
+                              ? 'bg-rose-500'
+                              : currentSla.isNearBreach
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${currentSla.progressPercent}%` }}
+                        />
                       </div>
+                    </div>
+                  </div>
 
-                    {currentTicket.status === TicketStatus.CLOSED ? (
-                      <div className="text-slate-500 font-medium">
-                        {currentTicket.assignedToName || 'Unassigned (Closed)'}
-                      </div>
-                    ) : currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.AGENT ? (
-                      <select
-                        value={currentTicket.assignedToId || ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (!val) {
-                            assignToAgent(null, 'Unassigned ticket back to pool');
-                          } else {
-                            const selectedAgent = availableSupportAgents.find((a) => a.id === val);
-                            if (selectedAgent) {
-                              assignToAgent({ id: selectedAgent.id, name: selectedAgent.name });
-                            }
-                          }
-                        }}
-                        className="w-full bg-white border border-slate-200 rounded-md p-1 font-medium text-slate-800 focus:outline-none focus:border-slate-800 cursor-pointer text-xs"
-                      >
-                        <option value="">-- Unassigned (Triage Pool) --</option>
-                        {availableSupportAgents.map((agt) => (
-                          <option key={agt.id} value={agt.id}>
-                            {agt.name} ({agt.role === UserRole.AGENT ? 'Support' : agt.role})
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="font-semibold text-slate-800">
-                        {currentTicket.assignedToName || 'Unassigned (In Triage)'}
-                      </div>
-                    )}
+                  <div className="pt-4 text-xs text-slate-700 leading-relaxed">
+                    <p>{currentTicket.description}</p>
                   </div>
                 </div>
-              </div>
-
-              <div className="pt-4 text-xs text-slate-700 leading-relaxed">
-                <p>{currentTicket.description}</p>
-              </div>
-              </div>
+              );
+            })()}
 
               {/* Attachments Section with Thumbnails, Specific Mime Icons & Direct Downloads */}
               <TicketAttachmentList

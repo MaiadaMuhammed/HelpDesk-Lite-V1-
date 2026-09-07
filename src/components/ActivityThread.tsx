@@ -6,8 +6,9 @@
  */
 
 import React, { useState } from 'react';
-import { ActivityMessage, User, UserRole, AuditAction } from '../types/ticket';
-import { Lock, MessageSquare, Send, EyeOff, User as UserIcon, FileSpreadsheet } from 'lucide-react';
+import { ActivityMessage, User, UserRole } from '../types/ticket';
+import { Lock, MessageSquare, Send, FileSpreadsheet, Zap } from 'lucide-react';
+import { QUICK_STAFF_REPLIES, QUICK_REQUESTER_REPLIES } from '../utils/smartHelpers';
 
 interface ActivityThreadProps {
   messages: ActivityMessage[];
@@ -177,6 +178,29 @@ export const ActivityThread: React.FC<ActivityThreadProps> = ({
                 Staff Note (Private)
               </span>
             </label>
+          </div>
+        )}
+
+        {/* Smart Quick Canned Replies */}
+        {!disabled && (
+          <div className="mb-2">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1">
+              <Zap className="w-2.5 h-2.5 text-amber-500" />
+              <span className="font-medium">Quick responses:</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {(isStaff ? QUICK_STAFF_REPLIES : QUICK_REQUESTER_REPLIES).map((snippet, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setContent(snippet)}
+                  className="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer truncate max-w-[240px]"
+                  title={snippet}
+                >
+                  {snippet}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
