@@ -184,46 +184,46 @@ SMTP-Status: ${notif.smtpResponseCode}`;
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+    <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden flex flex-col">
       {/* Header Banner */}
-      <div className="p-4 border-b border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="p-3.5 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-xs">
-            <Mail className="w-4 h-4" />
+          <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center text-white">
+            <Mail className="w-3.5 h-3.5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-bold text-slate-900 text-sm">
-                Email Dispatch Transparency Log
+              <h3 className="font-semibold text-slate-900 text-xs">
+                Email Dispatch Log
               </h3>
-              <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-[11px] font-bold">
+              <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-[10px] font-medium">
                 {notifications.length} {notifications.length === 1 ? 'dispatch' : 'dispatches'}
               </span>
               {unreadStatusCount > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-[11px] font-bold animate-pulse">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-medium">
                   <AlertCircle className="w-3 h-3 text-amber-600" />
-                  {unreadStatusCount} status {unreadStatusCount === 1 ? 'alert' : 'alerts'} unacknowledged
+                  {unreadStatusCount} pending alert{unreadStatusCount === 1 ? '' : 's'}
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-400">
               Audit log of simulated outbound SMTP messages sent for status changes, assignments, and replies
             </p>
           </div>
         </div>
 
         {/* Action button group */}
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto shrink-0">
           {unreadStatusCount > 0 && onMarkAllRead && (
             <button
               type="button"
               id="btn-ack-all-status-alerts"
               onClick={() => onMarkAllRead(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-md text-xs font-medium transition-colors cursor-pointer"
               title="Acknowledge all pending status transition alerts for this ticket"
             >
-              <CheckCheck className="w-3.5 h-3.5 text-amber-700" />
-              <span>Acknowledge Status Alerts ({unreadStatusCount})</span>
+              <CheckCheck className="w-3.5 h-3.5 text-amber-600" />
+              <span>Acknowledge Alerts ({unreadStatusCount})</span>
             </button>
           )}
 
@@ -232,10 +232,10 @@ SMTP-Status: ${notif.smtpResponseCode}`;
               type="button"
               id="btn-mark-all-read"
               onClick={() => onMarkAllRead(false)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-md text-xs font-medium shadow-2xs transition-colors cursor-pointer"
               title="Mark all notifications as read"
             >
-              <Check className="w-3.5 h-3.5 text-slate-500" />
+              <Check className="w-3 h-3 text-slate-500" />
               <span>Mark All Read</span>
             </button>
           )}
@@ -244,45 +244,42 @@ SMTP-Status: ${notif.smtpResponseCode}`;
             <button
               type="button"
               onClick={onSendTestNotification}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition-colors self-start sm:self-auto shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-md text-xs font-medium shadow-2xs transition-colors self-start sm:self-auto shrink-0 cursor-pointer"
               title="Simulate sending a test email dispatch for this ticket"
             >
-              <Send className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Simulate Test Dispatch</span>
+              <Send className="w-3 h-3 text-slate-500" />
+              <span>Simulate Test</span>
             </button>
           )}
         </div>
       </div>
 
       {/* Quick Diagnostics & Relay Banner */}
-      <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-700">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+      <div className="px-3.5 py-1.5 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+        <div className="flex items-center gap-1.5">
+          <ShieldCheck className="w-3 h-3 text-emerald-600" />
           <span>
-            Simulated Relay: <strong className="font-mono text-slate-800">smtp-relay.company.local:587</strong> (TLS 1.3 • SPF pass • DKIM signed)
+            Relay: <span className="font-mono text-slate-700">smtp-relay.company.local:587</span> (TLS 1.3 • SPF pass • DKIM signed)
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-slate-500">
+        <div className="flex items-center gap-2">
+          <span>
             {unreadTotalCount === 0 ? (
               <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                All notifications acknowledged
+                All acknowledged
               </span>
             ) : (
               <span className="text-slate-600 font-medium">
-                {unreadTotalCount} unread ({unreadStatusCount} status {unreadStatusCount === 1 ? 'alert' : 'alerts'})
+                {unreadTotalCount} unread
               </span>
             )}
-          </span>
-          <span className="text-emerald-700 font-medium hidden sm:inline">
-            {notifications.length > 0 ? 'Delivery: 250 OK' : 'Standing by'}
           </span>
         </div>
       </div>
 
       {/* Search & Filter Controls */}
-      <div className="p-3 border-b border-slate-200 bg-white space-y-2">
+      <div className="p-3 border-b border-slate-100 bg-white space-y-2">
         <div className="flex flex-col sm:flex-row gap-2">
           {/* Search text */}
           <div className="relative flex-1">
@@ -292,8 +289,8 @@ SMTP-Status: ${notif.smtpResponseCode}`;
               id="notification-search-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by subject, recipient email, name, or content..."
-              className="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 transition-all"
+              placeholder="Search by subject, email, or content..."
+              className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 focus:border-slate-800 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden transition-all"
             />
             {searchQuery && (
               <button
@@ -314,15 +311,15 @@ SMTP-Status: ${notif.smtpResponseCode}`;
               value={readFilter}
               onChange={(e) => setReadFilter(e.target.value as any)}
               aria-label="Filter notifications by read acknowledgement state"
-              className="bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-lg py-1.5 px-2.5 text-xs text-slate-700 font-medium focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer transition-all"
+              className="bg-slate-50 border border-slate-200 focus:border-slate-800 rounded-lg py-1.5 px-2.5 text-xs text-slate-700 font-medium focus:outline-hidden cursor-pointer transition-all"
             >
-              <option value="ALL">All Read States ({notifications.length})</option>
+              <option value="ALL">All States ({notifications.length})</option>
               <option value="UNREAD_STATUS">
-                Unacknowledged Status Alerts ({unreadStatusCount})
+                Alerts Pending ({unreadStatusCount})
               </option>
-              <option value="UNREAD">All Unread ({unreadTotalCount})</option>
+              <option value="UNREAD">Unread ({unreadTotalCount})</option>
               <option value="READ">
-                Acknowledged / Read ({notifications.length - unreadTotalCount})
+                Read ({notifications.length - unreadTotalCount})
               </option>
             </select>
           </div>
@@ -335,13 +332,13 @@ SMTP-Status: ${notif.smtpResponseCode}`;
               value={triggerFilter}
               onChange={(e) => setTriggerFilter(e.target.value)}
               aria-label="Filter notifications by event trigger"
-              className="bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-lg py-1.5 px-2.5 text-xs text-slate-700 font-medium focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer transition-all"
+              className="bg-slate-50 border border-slate-200 focus:border-slate-800 rounded-lg py-1.5 px-2.5 text-xs text-slate-700 font-medium focus:outline-hidden cursor-pointer transition-all"
             >
-              <option value="ALL">All Event Triggers</option>
-              <option value={NotificationTrigger.STATUS_CHANGED}>Status Transitions</option>
-              <option value={NotificationTrigger.ASSIGNMENT_CHANGED}>Assignment Changes</option>
-              <option value={NotificationTrigger.NEW_MESSAGE}>Replies & Messages</option>
-              <option value={NotificationTrigger.TICKET_CREATED}>Ticket Created</option>
+              <option value="ALL">All Triggers</option>
+              <option value={NotificationTrigger.STATUS_CHANGED}>Status Changes</option>
+              <option value={NotificationTrigger.ASSIGNMENT_CHANGED}>Assignments</option>
+              <option value={NotificationTrigger.NEW_MESSAGE}>Messages</option>
+              <option value={NotificationTrigger.TICKET_CREATED}>Created</option>
             </select>
           </div>
 
@@ -352,11 +349,11 @@ SMTP-Status: ${notif.smtpResponseCode}`;
               value={recipientFilter}
               onChange={(e) => setRecipientFilter(e.target.value)}
               aria-label="Filter notifications by recipient role"
-              className="bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-lg py-1.5 px-2.5 text-xs text-slate-700 font-medium focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer transition-all"
+              className="bg-slate-50 border border-slate-200 focus:border-slate-800 rounded-lg py-1.5 px-2.5 text-xs text-slate-700 font-medium focus:outline-hidden cursor-pointer transition-all"
             >
               <option value="ALL">All Recipients</option>
-              <option value="REQUESTER">Requester Only</option>
-              <option value="STAFF">Staff / Assignees Only</option>
+              <option value="REQUESTER">Requester</option>
+              <option value="STAFF">Staff</option>
             </select>
           </div>
         </div>

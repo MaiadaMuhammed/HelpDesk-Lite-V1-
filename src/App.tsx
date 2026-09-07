@@ -78,6 +78,7 @@ import {
   FileSpreadsheet,
   Download,
   Bell,
+  Search,
   CheckCheck,
   LogOut,
   User as UserIcon,
@@ -284,6 +285,39 @@ const RAW_INITIAL_SEED_TICKETS: Ticket[] = [
     createdAt: new Date(Date.now() - 20000000).toISOString(),
     updatedAt: new Date(Date.now() - 5000000).toISOString(),
   },
+  {
+    id: 'HDL-1038',
+    title: 'Dual monitor arm clamp adjustment for ergonomic workstation',
+    description: 'Desk 4B needs dual display arms repositioned and cable guide installed.',
+    category: TicketCategory.FACILITIES,
+    priority: TicketPriority.LOW,
+    status: TicketStatus.RESOLVED,
+    requesterId: PROFILE_MAIADA_EMPLOYEE.id,
+    requesterName: PROFILE_MAIADA_EMPLOYEE.name,
+    requesterEmail: PROFILE_MAIADA_EMPLOYEE.email,
+    assignedToId: PROFILE_EMAN_SUPPORT.id,
+    assignedToName: PROFILE_EMAN_SUPPORT.name,
+    attachments: [],
+    messages: [
+      {
+        id: 'msg_1038_1',
+        ticketId: 'HDL-1038',
+        authorId: PROFILE_EMAN_SUPPORT.id,
+        authorName: PROFILE_EMAN_SUPPORT.name,
+        authorRole: UserRole.AGENT,
+        content: 'Adjusted display mounts to recommended eye level and secured safety clips.',
+        isPrivateStaffNote: false,
+        createdAt: new Date(Date.now() - 4000000).toISOString(),
+      },
+    ],
+    auditLogs: [],
+    firstResponseAt: new Date(Date.now() - 6000000).toISOString(),
+    resolvedAt: new Date(Date.now() - 4000000).toISOString(),
+    closedAt: null,
+    slaDueAt: new Date(Date.now() + 48 * 3600000).toISOString(),
+    createdAt: new Date(Date.now() - 10000000).toISOString(),
+    updatedAt: new Date(Date.now() - 4000000).toISOString(),
+  },
 ];
 
 const INITIAL_SEED_TICKETS: Ticket[] = RAW_INITIAL_SEED_TICKETS.map((t) => ({
@@ -301,6 +335,8 @@ export default function App() {
   const [selectedTicketId, setSelectedTicketId] = useState<string>(INITIAL_SEED_TICKETS[0].id);
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'STUDIO' | 'TEST_SUITE' | 'DOCS'>('STUDIO');
@@ -619,6 +655,23 @@ export default function App() {
   const filteredTickets = tickets.filter((t) => {
     if (categoryFilter !== 'ALL' && t.category !== categoryFilter) return false;
     if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
+    if (priorityFilter !== 'ALL') {
+      if (priorityFilter === 'URGENT' || priorityFilter === TicketPriority.CRITICAL) {
+        if (t.priority !== TicketPriority.CRITICAL && (t.priority as string) !== 'URGENT') {
+          return false;
+        }
+      } else if (t.priority !== priorityFilter) {
+        return false;
+      }
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchId = t.id.toLowerCase().includes(q);
+      const matchTitle = t.title.toLowerCase().includes(q);
+      if (!matchId && !matchTitle) {
+        return false;
+      }
+    }
     return true;
   });
 
@@ -636,25 +689,25 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col antialiased">
+    <div className="min-h-screen bg-slate-50/70 text-slate-900 flex flex-col antialiased">
       {/* Top Application Bar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-xs">
-              <Layers className="w-5 h-5" />
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-15 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
+              <Layers className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-black tracking-tight text-base text-slate-900">
+                <span className="font-semibold text-sm text-slate-900">
                   HelpDesk Lite
                 </span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200/80">
                   V1 MVP • HDL-06
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 hidden sm:block">
-                5-State Finite State Machine & Lifecycle Engine
+              <p className="text-[11px] text-slate-400 hidden sm:block">
+                5-State Finite State Machine
               </p>
             </div>
           </div>
@@ -662,27 +715,27 @@ export default function App() {
           {/* Authenticated Profile Switcher & New Ticket Button */}
           <div className="flex items-center gap-2.5">
             {/* Active User Card & Switcher */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-2xs">
+            <div className="flex items-center gap-2 bg-white border border-slate-200/80 rounded-lg px-2.5 py-1.5 shadow-2xs">
               <div
-                className={`w-7 h-7 rounded-lg ${
-                  currentUser.avatarColor || 'bg-indigo-600 text-white'
-                } flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs`}
+                className={`w-6 h-6 rounded-md ${
+                  currentUser.avatarColor || 'bg-slate-800 text-white'
+                } flex items-center justify-center font-medium text-[11px] shrink-0`}
               >
                 {getInitials(currentUser.name)}
               </div>
 
               <div className="flex flex-col text-left">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-xs text-slate-900 leading-tight">
+                  <span className="font-medium text-xs text-slate-900 leading-tight">
                     {currentUser.name}
                   </span>
                   <span
-                    className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase tracking-wider ${
+                    className={`px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase tracking-wider ${
                       currentUser.role === UserRole.REQUESTER
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                         : currentUser.role === UserRole.AGENT
-                        ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                        : 'bg-purple-100 text-purple-800 border border-purple-200'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                        : 'bg-purple-50 text-purple-700 border border-purple-200/60'
                     }`}
                   >
                     {currentUser.role === UserRole.REQUESTER
@@ -692,18 +745,18 @@ export default function App() {
                       : 'Manager'}
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-500 leading-tight truncate max-w-[130px] hidden sm:inline">
+                <span className="text-[10px] text-slate-400 leading-tight truncate max-w-[130px] hidden sm:inline">
                   {currentUser.department || currentUser.email}
                 </span>
               </div>
 
               {/* Profile Switcher Dropdown */}
-              <div className="pl-1 border-l border-slate-200 ml-1">
+              <div className="pl-1 border-l border-slate-100 ml-1">
                 <select
                   value={currentUser.id}
                   onChange={(e) => handleSwitchProfile(e.target.value)}
                   title="Switch between the 3 profiles or custom accounts"
-                  className="bg-white border border-slate-300 rounded px-1.5 py-1 font-semibold text-slate-800 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className="bg-slate-50 border border-slate-200 rounded-md px-1.5 py-0.5 font-medium text-slate-800 text-[11px] focus:outline-none focus:border-slate-800 cursor-pointer"
                 >
                   <optgroup label="Official Profiles">
                     <option value={PROFILE_MAIADA_EMPLOYEE.id}>Maiada Muhammed (Employee)</option>
@@ -729,10 +782,10 @@ export default function App() {
                 type="button"
                 id="btn-header-signout"
                 onClick={handleSignOut}
-                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer ml-0.5"
+                className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer ml-0.5"
                 title="Sign Out & Return to Login / Sign Up screen"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
 
@@ -740,7 +793,7 @@ export default function App() {
               type="button"
               id="btn-new-ticket"
               onClick={() => setIsSubmissionModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Ticket</span>
@@ -750,13 +803,13 @@ export default function App() {
 
         {/* Sub-Navigation Tabs */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-100 flex items-center justify-between text-xs">
-          <div className="flex gap-1">
+          <div className="flex gap-4">
             <button
               onClick={() => setActiveTab('STUDIO')}
-              className={`px-3 py-2 font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+              className={`py-2.5 font-medium border-b-2 transition-colors flex items-center gap-1.5 text-xs ${
                 activeTab === 'STUDIO'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  ? 'border-slate-900 text-slate-900'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -764,24 +817,24 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab('TEST_SUITE')}
-              className={`px-3 py-2 font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+              className={`py-2.5 font-medium border-b-2 transition-colors flex items-center gap-1.5 text-xs ${
                 activeTab === 'TEST_SUITE'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  ? 'border-slate-900 text-slate-900'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
               <Bug className="w-3.5 h-3.5" />
-              HDL-06 Verification Suite
-              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
-                {TEST_SUITE.length} Tests
+              Verification Suite
+              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-700 font-medium">
+                {TEST_SUITE.length}
               </span>
             </button>
             <button
               onClick={() => setActiveTab('DOCS')}
-              className={`px-3 py-2 font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+              className={`py-2.5 font-medium border-b-2 transition-colors flex items-center gap-1.5 text-xs ${
                 activeTab === 'DOCS'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  ? 'border-slate-900 text-slate-900'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
               <BookOpen className="w-3.5 h-3.5" />
@@ -790,15 +843,15 @@ export default function App() {
           </div>
 
           <div className="text-[11px] text-slate-500 hidden sm:flex items-center gap-2.5">
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-md">
-              <span className={`w-2 h-2 rounded-full ${isPollingEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
-              <span className="font-medium text-slate-700">
-                Polling: <span className="font-semibold text-slate-900">{isPollingEnabled ? `Active (every 30s • in ${secondsUntilNextPoll}s)` : 'Paused'}</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/70 px-2 py-0.5 rounded-md">
+              <span className={`w-1.5 h-1.5 rounded-full ${isPollingEnabled ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+              <span className="text-slate-600 font-medium">
+                Polling: <span className="text-slate-900 font-normal">{isPollingEnabled ? `Active (30s)` : 'Paused'}</span>
               </span>
             </div>
             <span className="text-slate-300">|</span>
-            <span className="font-mono text-slate-500">
-              Synced: <strong className="text-slate-700">{lastPollTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>
+            <span className="font-mono text-slate-400">
+              Synced: <strong className="text-slate-600 font-normal">{lastPollTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
             </span>
           </div>
         </div>
@@ -813,25 +866,22 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Queue Panel: Tickets list & filters */}
             <div className="lg:col-span-4 space-y-4">
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+              <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-2xs">
                 {/* Live Polling Status & Queue Controls Header */}
-                <div className="px-3.5 py-2.5 bg-slate-900 text-white flex items-center justify-between text-xs border-b border-slate-800">
+                <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <span className="relative flex h-2 w-2">
                       {isPollingEnabled ? (
-                        <>
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       ) : (
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
                       )}
                     </span>
-                    <span className="font-semibold text-slate-200 text-[11px] flex items-center gap-1">
+                    <span className="font-medium text-slate-700 text-[11px] flex items-center gap-1">
                       <span>{isPollingEnabled ? 'Live Polling' : 'Polling Paused'}</span>
                     </span>
-                    <span className="text-[10px] text-indigo-300 font-mono">
-                      {isPollingEnabled ? `(30s • in ${secondsUntilNextPoll}s)` : '(paused)'}
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {isPollingEnabled ? `(30s)` : '(paused)'}
                     </span>
                   </div>
 
@@ -841,16 +891,16 @@ export default function App() {
                       id="btn-toggle-polling"
                       onClick={() => setIsPollingEnabled(!isPollingEnabled)}
                       title={isPollingEnabled ? 'Pause automated polling' : 'Resume automated polling'}
-                      className="px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer text-[10px] flex items-center gap-1 border border-slate-700"
+                      className="px-2 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer text-[10px] flex items-center gap-1 border border-slate-200 font-medium"
                     >
                       {isPollingEnabled ? (
                         <>
-                          <Pause className="w-3 h-3 text-amber-300" />
+                          <Pause className="w-2.5 h-2.5 text-amber-500" />
                           <span>Pause</span>
                         </>
                       ) : (
                         <>
-                          <Play className="w-3 h-3 text-emerald-400" />
+                          <Play className="w-2.5 h-2.5 text-emerald-600" />
                           <span>Resume</span>
                         </>
                       )}
@@ -861,9 +911,9 @@ export default function App() {
                       onClick={handleExecutePoll}
                       disabled={isPollSyncing}
                       title="Poll immediately for ticket updates"
-                      className="px-2.5 py-0.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white transition-colors flex items-center gap-1 cursor-pointer text-[10px] font-semibold disabled:opacity-50 shadow-xs"
+                      className="px-2.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-white transition-colors flex items-center gap-1 cursor-pointer text-[10px] font-medium disabled:opacity-50"
                     >
-                      <RefreshCw className={`w-3 h-3 ${isPollSyncing ? 'animate-spin' : ''}`} />
+                      <RefreshCw className={`w-2.5 h-2.5 ${isPollSyncing ? 'animate-spin' : ''}`} />
                       <span>Poll Now</span>
                     </button>
                   </div>
@@ -871,57 +921,138 @@ export default function App() {
 
                 {/* Polling Activity Summary Banner */}
                 {lastPollSummary && (
-                  <div className="px-3.5 py-1.5 bg-indigo-50/90 border-b border-indigo-100 flex items-center justify-between text-[11px] text-indigo-950">
-                    <span className="truncate pr-2 font-medium flex items-center gap-1">
-                      <Radio className="w-3 h-3 text-indigo-600 shrink-0 animate-pulse" />
+                  <div className="px-3.5 py-1.5 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
+                    <span className="truncate pr-2 flex items-center gap-1">
+                      <Radio className="w-2.5 h-2.5 text-slate-400 shrink-0" />
                       <span className="truncate">{lastPollSummary}</span>
                     </span>
-                    <span className="text-[10px] text-indigo-600 shrink-0 font-mono">
+                    <span className="text-[10px] text-slate-400 shrink-0 font-mono">
                       {lastPollTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
                   </div>
                 )}
 
                 {/* Filters */}
-                <div className="p-3.5 border-b border-slate-200 bg-slate-50/70 space-y-2.5">
+                <div className="p-3 border-b border-slate-100 bg-white space-y-2.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                      <Inbox className="w-4 h-4 text-slate-600" />
-                      Ticket Queue
+                    <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                      <Inbox className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Ticket Queue</span>
                     </span>
-                    <span className="text-[11px] font-mono text-slate-500">
-                      {filteredTickets.length} tickets
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {(searchQuery.trim() || priorityFilter !== 'ALL' || categoryFilter !== 'ALL' || statusFilter !== 'ALL') && (
+                        <button
+                          type="button"
+                          id="btn-clear-filters"
+                          onClick={() => {
+                            setSearchQuery('');
+                            setPriorityFilter('ALL');
+                            setCategoryFilter('ALL');
+                            setStatusFilter('ALL');
+                          }}
+                          className="text-[10px] text-slate-500 hover:text-slate-800 font-medium cursor-pointer underline"
+                          title="Reset search and filters"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                      <span className="text-[11px] font-mono text-slate-400">
+                        {filteredTickets.length} tickets
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div>
-                      <label className="block text-slate-500 font-medium mb-0.5">Category</label>
-                      <select
-                        value={categoryFilter}
-                        onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded p-1 text-slate-800 focus:outline-none"
+                  {/* Real-Time Search Field (Title & ID) */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+                      <Search className="w-3.5 h-3.5" />
+                    </div>
+                    <input
+                      id="input-ticket-search"
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search by title or ID (e.g. HDL-1042)..."
+                      className="w-full bg-slate-50 border border-slate-200/80 rounded-md pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:bg-white transition-colors"
+                      autoComplete="off"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        id="btn-clear-search"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                        title="Clear search"
                       >
-                        <option value="ALL">All Categories</option>
-                        <option value={TicketCategory.IT}>IT</option>
-                        <option value={TicketCategory.HR}>HR</option>
-                        <option value={TicketCategory.FACILITIES}>Facilities</option>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 text-[11px]">
+                    {/* Priority Level Dropdown (urgent, High, Medium, Low) */}
+                    <div>
+                      <label htmlFor="filter-priority" className="block text-slate-400 font-medium mb-0.5 flex items-center justify-between">
+                        <span>Priority</span>
+                        {priorityFilter !== 'ALL' && (
+                          <span className={`text-[10px] font-semibold ${
+                            priorityFilter === TicketPriority.CRITICAL || priorityFilter === 'URGENT'
+                              ? 'text-rose-600'
+                              : priorityFilter === TicketPriority.HIGH
+                              ? 'text-amber-600'
+                              : priorityFilter === TicketPriority.MEDIUM
+                              ? 'text-blue-600'
+                              : 'text-slate-600'
+                          }`}>
+                            Filtered
+                          </span>
+                        )}
+                      </label>
+                      <select
+                        id="filter-priority"
+                        value={priorityFilter}
+                        onChange={(e) => setPriorityFilter(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-md px-2 py-1 text-slate-800 focus:outline-none focus:border-slate-800 cursor-pointer"
+                      >
+                        <option value="ALL">All Priorities</option>
+                        <option value={TicketPriority.CRITICAL}>Urgent</option>
+                        <option value={TicketPriority.HIGH}>High</option>
+                        <option value={TicketPriority.MEDIUM}>Medium</option>
+                        <option value={TicketPriority.LOW}>Low</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-slate-500 font-medium mb-0.5">Status</label>
-                      <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded p-1 text-slate-800 focus:outline-none"
-                      >
-                        <option value="ALL">All States</option>
-                        <option value={TicketStatus.NEW}>NEW</option>
-                        <option value={TicketStatus.ASSIGNED}>ASSIGNED</option>
-                        <option value={TicketStatus.IN_PROGRESS}>IN_PROGRESS</option>
-                        <option value={TicketStatus.RESOLVED}>RESOLVED</option>
-                        <option value={TicketStatus.CLOSED}>CLOSED</option>
-                      </select>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label htmlFor="filter-category" className="block text-slate-400 font-medium mb-0.5">Category</label>
+                        <select
+                          id="filter-category"
+                          value={categoryFilter}
+                          onChange={(e) => setCategoryFilter(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200/80 rounded-md px-2 py-1 text-slate-800 focus:outline-none focus:border-slate-800 cursor-pointer"
+                        >
+                          <option value="ALL">All Categories</option>
+                          <option value={TicketCategory.IT}>IT</option>
+                          <option value={TicketCategory.HR}>HR</option>
+                          <option value={TicketCategory.FACILITIES}>Facilities</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="filter-status" className="block text-slate-400 font-medium mb-0.5">Status</label>
+                        <select
+                          id="filter-status"
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200/80 rounded-md px-2 py-1 text-slate-800 focus:outline-none focus:border-slate-800 cursor-pointer"
+                        >
+                          <option value="ALL">All States</option>
+                          <option value={TicketStatus.NEW}>NEW</option>
+                          <option value={TicketStatus.ASSIGNED}>ASSIGNED</option>
+                          <option value={TicketStatus.IN_PROGRESS}>IN_PROGRESS</option>
+                          <option value={TicketStatus.RESOLVED}>RESOLVED</option>
+                          <option value={TicketStatus.CLOSED}>CLOSED</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -944,20 +1075,20 @@ export default function App() {
                         key={t.id}
                         id={`queue-item-${t.id}`}
                         onClick={() => handleSelectTicket(t.id)}
-                        className={`p-3.5 cursor-pointer transition-colors text-xs ${
+                        className={`p-3 cursor-pointer transition-colors text-xs ${
                           isSelected
-                            ? 'bg-indigo-50/70 border-l-4 border-indigo-600'
-                            : 'hover:bg-slate-50 border-l-4 border-transparent'
+                            ? 'bg-slate-100/90 border-l-2 border-slate-900'
+                            : 'hover:bg-slate-50/70 border-l-2 border-transparent'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-1 mb-1">
-                          <span className="font-mono font-bold text-slate-700">
+                          <span className="font-mono font-semibold text-slate-700">
                             {t.id}
                           </span>
                           <div className="flex items-center gap-1.5">
                             {ticketUnreadStatusCount > 0 && (
                               <span
-                                className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-0.5 animate-pulse"
+                                className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200/70 flex items-center gap-0.5"
                                 title={`${ticketUnreadStatusCount} unacknowledged status alert(s)`}
                               >
                                 <Bell className="w-2.5 h-2.5 text-amber-600" />
@@ -965,21 +1096,21 @@ export default function App() {
                               </span>
                             )}
                             {isOverdue && (
-                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-800 animate-pulse">
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-rose-50 text-rose-700 border border-rose-200/60">
                                 Overdue
                               </span>
                             )}
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              className={`px-1.5 py-0.2 rounded text-[10px] font-medium ${
                                 t.status === TicketStatus.NEW
-                                  ? 'bg-amber-100 text-amber-800'
+                                  ? 'bg-amber-50 text-amber-800 border border-amber-200/60'
                                   : t.status === TicketStatus.ASSIGNED
-                                  ? 'bg-blue-100 text-blue-800'
+                                  ? 'bg-blue-50 text-blue-800 border border-blue-200/60'
                                   : t.status === TicketStatus.IN_PROGRESS
-                                  ? 'bg-purple-100 text-purple-800'
+                                  ? 'bg-purple-50 text-purple-800 border border-purple-200/60'
                                   : t.status === TicketStatus.RESOLVED
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-slate-200 text-slate-700'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/60'
+                                  : 'bg-slate-100 text-slate-600'
                               }`}
                             >
                               {t.status}
@@ -987,15 +1118,37 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="font-medium text-slate-900 line-clamp-1">
+                        <div className="font-medium text-slate-800 line-clamp-1">
                           {t.title}
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2">
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                            {t.category}
-                          </span>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                              {t.category}
+                            </span>
+                            <span className="text-slate-300">•</span>
+                            <span
+                              className={`font-medium ${
+                                t.priority === TicketPriority.CRITICAL
+                                  ? 'text-rose-600'
+                                  : t.priority === TicketPriority.HIGH
+                                  ? 'text-amber-600'
+                                  : t.priority === TicketPriority.MEDIUM
+                                  ? 'text-blue-600'
+                                  : 'text-slate-500'
+                              }`}
+                            >
+                              {t.priority === TicketPriority.CRITICAL
+                                ? 'Urgent'
+                                : t.priority === TicketPriority.HIGH
+                                ? 'High'
+                                : t.priority === TicketPriority.MEDIUM
+                                ? 'Medium'
+                                : 'Low'}
+                            </span>
+                          </div>
                           <span>
                             {t.assignedToName ? t.assignedToName : 'Unassigned'}
                           </span>
@@ -1003,6 +1156,31 @@ export default function App() {
                       </div>
                     );
                   })}
+
+                  {filteredTickets.length === 0 && (
+                    <div className="p-6 text-center text-slate-500 space-y-2">
+                      <Filter className="w-5 h-5 mx-auto text-slate-300" />
+                      <p className="text-xs font-medium text-slate-700">No matching tickets</p>
+                      <p className="text-[11px] text-slate-400">
+                        {searchQuery.trim()
+                          ? `No tickets match "${searchQuery}" with the current filter criteria.`
+                          : 'No tickets match the selected priority or filter criteria.'}
+                      </p>
+                      <button
+                        type="button"
+                        id="btn-reset-filters-empty"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setPriorityFilter('ALL');
+                          setCategoryFilter('ALL');
+                          setStatusFilter('ALL');
+                        }}
+                        className="text-xs text-slate-800 hover:text-slate-900 font-medium underline cursor-pointer"
+                      >
+                        Reset search & filters
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1010,60 +1188,49 @@ export default function App() {
             {/* Right Panel: State Machine Inspector & Active Ticket Details */}
             <div className="lg:col-span-8 space-y-6">
               {/* Ticket Header & Single-Agent Manual Assignment */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+              <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs">
                 <div className="flex flex-wrap items-start justify-between gap-3 pb-4 border-b border-slate-100">
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="font-mono text-xs font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/80">
                         {currentTicket.id}
                       </span>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-50 text-slate-600 border border-slate-200/60">
                         {currentTicket.category}
                       </span>
                       <span
-                        className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                        className={`text-xs font-medium px-2 py-0.5 rounded ${
                           currentTicket.priority === TicketPriority.CRITICAL
-                            ? 'bg-rose-100 text-rose-800 font-bold'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
                             : currentTicket.priority === TicketPriority.HIGH
-                            ? 'bg-orange-100 text-orange-800'
-                            : 'bg-slate-100 text-slate-700'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                            : 'bg-slate-50 text-slate-600 border border-slate-200/60'
                         }`}
                       >
                         {currentTicket.priority} Priority
                       </span>
                     </div>
-                    <h1 className="text-lg font-bold text-slate-900 leading-snug">
+                    <h1 className="text-base font-semibold text-slate-900 leading-snug">
                       {currentTicket.title}
                     </h1>
-                    <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-500 mt-1">
-                      <span>Requester: <strong className="text-slate-700">{currentTicket.requesterName}</strong></span>
-                      <span>•</span>
-                      <span>SLA Target: <strong className="text-slate-700">{new Date(currentTicket.slaDueAt).toLocaleDateString()} {new Date(currentTicket.slaDueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
-                      <span>•</span>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1.5">
+                      <span>Requester: <strong className="text-slate-700 font-medium">{currentTicket.requesterName}</strong></span>
+                      <span className="text-slate-300">•</span>
+                      <span>SLA: <strong className="text-slate-700 font-medium">{new Date(currentTicket.slaDueAt).toLocaleDateString()} {new Date(currentTicket.slaDueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
+                      <span className="text-slate-300">•</span>
                       <button
                         type="button"
                         onClick={() => setSubPanelView('NOTIFICATIONS')}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold border border-indigo-200 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium border border-slate-200 transition-colors cursor-pointer"
                         title="View Outbound Email Transparency Log & Acknowledge Status Alerts"
                       >
-                        <Mail className="w-3 h-3 text-indigo-600" />
-                        <span>{(currentTicket.notifications || []).length} Dispatched Emails</span>
+                        <Mail className="w-3 h-3 text-slate-500" />
+                        <span>{(currentTicket.notifications || []).length} Emails</span>
                         {currentTicketUnreadStatusCount > 0 && (
-                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
-                            {currentTicketUnreadStatusCount} status alert{currentTicketUnreadStatusCount === 1 ? '' : 's'} to acknowledge
+                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-amber-500 text-white">
+                            {currentTicketUnreadStatusCount} new
                           </span>
                         )}
-                      </button>
-                      <span>•</span>
-                      <button
-                        type="button"
-                        id="btn-header-export-csv"
-                        onClick={() => setIsExportModalOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold border border-emerald-300 transition-colors cursor-pointer shadow-2xs"
-                        title="Export current ticket activity thread & audit trail to CSV"
-                      >
-                        <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
-                        <span>Export to CSV</span>
                       </button>
                     </div>
                   </div>
@@ -1073,18 +1240,18 @@ export default function App() {
                       type="button"
                       id="btn-quick-export-csv"
                       onClick={() => setIsExportModalOpen(true)}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs w-full justify-center"
+                      className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer w-full justify-center"
                       title="Export ticket activity & audit logs to CSV"
                     >
-                      <Download className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Export History (CSV)</span>
+                      <Download className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Export CSV</span>
                     </button>
 
                     {/* Single-Agent Assignment Widget */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs min-w-[200px] w-full">
-                      <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5 mb-1.5">
-                        <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Single-Agent Assignee</span>
+                    <div className="bg-slate-50/70 border border-slate-200/80 rounded-lg p-2.5 text-xs min-w-[200px] w-full">
+                      <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wide flex items-center gap-1.5 mb-1">
+                        <UserCheck className="w-3 h-3 text-slate-500" />
+                        <span>Assignee</span>
                       </div>
 
                     {currentTicket.status === TicketStatus.CLOSED ? (
@@ -1105,7 +1272,7 @@ export default function App() {
                             }
                           }
                         }}
-                        className="w-full bg-white border border-slate-300 rounded p-1.5 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                        className="w-full bg-white border border-slate-200 rounded-md p-1 font-medium text-slate-800 focus:outline-none focus:border-slate-800 cursor-pointer text-xs"
                       >
                         <option value="">-- Unassigned (Triage Pool) --</option>
                         {availableSupportAgents.map((agt) => (
@@ -1174,13 +1341,13 @@ export default function App() {
               )}
 
               {/* Transition Control & Edge Case Tester */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs text-xs space-y-3">
+              <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-2xs text-xs space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-indigo-600" />
-                    <span>State Transition Engine Controls</span>
+                  <div className="font-semibold text-slate-800 flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-slate-500" />
+                    <span>State Transition Engine</span>
                   </div>
-                  <span className="text-[11px] text-slate-500 font-mono">
+                  <span className="text-[11px] text-slate-400 font-mono">
                     Actor: {currentUser.name} ({currentUser.role})
                   </span>
                 </div>
@@ -1192,17 +1359,17 @@ export default function App() {
                     placeholder="Optional transition reason / notes..."
                     value={transitionReason}
                     onChange={(e) => setTransitionReason(e.target.value)}
-                    className="flex-1 px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="flex-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-slate-800 bg-slate-50/50"
                   />
                 </div>
 
                 {/* Permitted Transitions for Active Role */}
                 <div>
-                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                  <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">
                     Authorized Next Transitions ({availableNextStates.length})
                   </div>
                   {availableNextStates.length === 0 ? (
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-slate-500 text-xs">
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200/70 text-slate-500 text-xs">
                       {currentTicket.status === TicketStatus.CLOSED
                         ? 'Ticket is permanently CLOSED (Terminal state). No transitions permitted.'
                         : `User with role '${currentUser.role}' has no authorized next transitions from ${currentTicket.status}. Switch to Manager or Agent to proceed.`}
@@ -1221,9 +1388,9 @@ export default function App() {
                                 `Transitioned from ${currentTicket.status} to ${target}`,
                             });
                           }}
-                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition-colors flex items-center gap-1.5"
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                           <span>Move to {target}</span>
                         </button>
                       ))}
@@ -1232,52 +1399,52 @@ export default function App() {
                 </div>
 
                 {/* Deliberate Illegal State Jump Tester (For QA Verification) */}
-                <div className="pt-3 border-t border-slate-100">
+                <div className="pt-2.5 border-t border-slate-100">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                      Test Illegal Jumps & Enforcements (Throws Domain Errors)
+                    <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
+                      Test Illegal Jumps & Enforcements
                     </span>
                     <span className="text-[10px] text-slate-400">
                       QA Test Matrix
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     <button
                       type="button"
                       onClick={() => transitionTo(TicketStatus.IN_PROGRESS)}
-                      className="px-2.5 py-1 rounded bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-[11px] text-slate-600 transition-colors"
+                      className="px-2 py-1 rounded-md bg-slate-50 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-slate-200/80 text-[11px] text-slate-600 transition-colors cursor-pointer"
                     >
-                      Attempt Skip to IN_PROGRESS
+                      Skip to IN_PROGRESS
                     </button>
                     <button
                       type="button"
                       onClick={() => transitionTo(TicketStatus.RESOLVED)}
-                      className="px-2.5 py-1 rounded bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-[11px] text-slate-600 transition-colors"
+                      className="px-2 py-1 rounded-md bg-slate-50 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-slate-200/80 text-[11px] text-slate-600 transition-colors cursor-pointer"
                     >
-                      Attempt Skip to RESOLVED
+                      Skip to RESOLVED
                     </button>
                     <button
                       type="button"
                       onClick={() => transitionTo(TicketStatus.CLOSED)}
-                      className="px-2.5 py-1 rounded bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-[11px] text-slate-600 transition-colors"
+                      className="px-2 py-1 rounded-md bg-slate-50 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-slate-200/80 text-[11px] text-slate-600 transition-colors cursor-pointer"
                     >
-                      Attempt Direct Skip to CLOSED
+                      Skip to CLOSED
                     </button>
                   </div>
                 </div>
               </div>
 
               {/* Sub-panel Stream Switcher */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200">
-                <div className="flex items-center bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200/80">
+                <div className="flex items-center bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/80">
                   <button
                     type="button"
                     onClick={() => setSubPanelView('SPLIT')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                       subPanelView === 'SPLIT'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Layers className="w-3.5 h-3.5" />
@@ -1286,45 +1453,45 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setSubPanelView('NOTIFICATIONS')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                       subPanelView === 'NOTIFICATIONS'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Mail className="w-3.5 h-3.5" />
-                    <span>Email History Log</span>
+                    <span>Email History</span>
                     <span
-                      className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-medium ${
                         subPanelView === 'NOTIFICATIONS'
-                          ? 'bg-white/20 text-white'
-                          : 'bg-indigo-50 text-indigo-700'
+                          ? 'bg-slate-100 text-slate-700'
+                          : 'bg-slate-200/70 text-slate-600'
                       }`}
                     >
                       {(currentTicket.notifications || []).length}
                     </span>
                     {currentTicketUnreadStatusCount > 0 && (
-                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white shadow-xs animate-pulse">
-                        {currentTicketUnreadStatusCount} new
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-amber-500 text-white">
+                        {currentTicketUnreadStatusCount}
                       </span>
                     )}
                   </button>
                   <button
                     type="button"
                     onClick={() => setSubPanelView('MESSAGES')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                       subPanelView === 'MESSAGES'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <FileText className="w-3.5 h-3.5" />
                     <span>Discussion</span>
                     <span
-                      className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-medium ${
                         subPanelView === 'MESSAGES'
-                          ? 'bg-white/20 text-white'
-                          : 'bg-slate-100 text-slate-700'
+                          ? 'bg-slate-100 text-slate-700'
+                          : 'bg-slate-200/70 text-slate-600'
                       }`}
                     >
                       {currentTicket.messages.length}
@@ -1333,19 +1500,19 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setSubPanelView('AUDIT')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                       subPanelView === 'AUDIT'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Clock className="w-3.5 h-3.5" />
                     <span>Audit Trail</span>
                     <span
-                      className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-medium ${
                         subPanelView === 'AUDIT'
-                          ? 'bg-white/20 text-white'
-                          : 'bg-slate-100 text-slate-700'
+                          ? 'bg-slate-100 text-slate-700'
+                          : 'bg-slate-200/70 text-slate-600'
                       }`}
                     >
                       {currentTicket.auditLogs.length}
@@ -1358,15 +1525,15 @@ export default function App() {
                     type="button"
                     id="btn-subpanel-export-csv"
                     onClick={() => setIsExportModalOpen(true)}
-                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded-md bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 text-xs font-medium shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
                     title="Export activity messages & audit logs to CSV"
                   >
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Export to CSV</span>
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Export CSV</span>
                   </button>
                   <div className="text-[11px] text-slate-500 hidden sm:flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Outbound SMTP Dispatch Simulator Active</span>
+                    <span>Outbound SMTP Simulator Active</span>
                   </div>
                 </div>
               </div>
@@ -1382,23 +1549,23 @@ export default function App() {
                     disabled={currentTicket.status === TicketStatus.CLOSED}
                   />
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between bg-slate-200/80 p-1 rounded-xl">
+                    <div className="flex items-center justify-between bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/80">
                       <button
                         type="button"
                         onClick={() => setRightPanelTab('NOTIFICATIONS')}
-                        className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                           rightPanelTab === 'NOTIFICATIONS'
-                            ? 'bg-white text-indigo-700 shadow-2xs'
+                            ? 'bg-white text-slate-900 shadow-2xs'
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
                         <Mail className="w-3.5 h-3.5" />
                         <span>Email Notifications</span>
-                        <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-bold">
+                        <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-medium">
                           {(currentTicket.notifications || []).length}
                         </span>
                         {currentTicketUnreadStatusCount > 0 && (
-                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
+                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-amber-500 text-white">
                             {currentTicketUnreadStatusCount}
                           </span>
                         )}
@@ -1406,7 +1573,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setRightPanelTab('AUDIT')}
-                        className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                           rightPanelTab === 'AUDIT'
                             ? 'bg-white text-slate-900 shadow-2xs'
                             : 'text-slate-600 hover:text-slate-900'
@@ -1414,7 +1581,7 @@ export default function App() {
                       >
                         <Clock className="w-3.5 h-3.5" />
                         <span>State Audit Trail</span>
-                        <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded-full text-[10px] font-bold">
+                        <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-medium">
                           {currentTicket.auditLogs.length}
                         </span>
                       </button>

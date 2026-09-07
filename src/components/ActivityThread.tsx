@@ -49,12 +49,12 @@ export const ActivityThread: React.FC<ActivityThreadProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-      <div className="p-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+    <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-slate-700" />
-          <h3 className="text-sm font-bold text-slate-900">Activity Thread</h3>
-          <span className="text-xs text-slate-400 font-mono">({visibleMessages.length} entries)</span>
+          <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+          <h3 className="text-xs font-semibold text-slate-800">Activity Thread</h3>
+          <span className="text-[11px] text-slate-400 font-mono">({visibleMessages.length})</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -64,27 +64,27 @@ export const ActivityThread: React.FC<ActivityThreadProps> = ({
               onClick={onExportCSV}
               id="btn-export-activity-csv"
               title="Export Activity Thread to CSV"
-              className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors flex items-center gap-1.5 text-xs font-semibold shadow-2xs cursor-pointer"
+              className="px-2.5 py-1 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5 text-[11px] font-medium cursor-pointer"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
+              <FileSpreadsheet className="w-3 h-3 text-slate-500" />
               <span>Export CSV</span>
             </button>
           )}
 
           {isStaff && (
-            <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
-              <Lock className="w-3 h-3 text-amber-600" />
-              <span>Staff note isolation active</span>
+            <div className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50/70 border border-amber-200/60 px-2 py-0.5 rounded-md">
+              <Lock className="w-2.5 h-2.5 text-amber-600" />
+              <span>Staff isolation</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Messages List */}
-      <div className="p-4 space-y-3.5 max-h-[360px] overflow-y-auto">
+      <div className="p-4 space-y-2.5 max-h-[360px] overflow-y-auto">
         {visibleMessages.length === 0 ? (
           <div className="text-center py-8 text-xs text-slate-400">
-            No replies or notes recorded on this ticket yet.
+            No activity recorded yet.
           </div>
         ) : (
           visibleMessages.map((msg, index) => {
@@ -93,53 +93,53 @@ export const ActivityThread: React.FC<ActivityThreadProps> = ({
             return (
               <div
                 key={`${msg.id}-${index}`}
-                className={`p-3.5 rounded-xl text-xs transition-all ${
+                className={`p-3 rounded-lg text-xs transition-colors ${
                   msg.isPrivateStaffNote
-                    ? 'bg-amber-50/80 border border-amber-200/90 text-amber-950'
+                    ? 'bg-amber-50/50 border border-amber-200/50 text-amber-950'
                     : isSelf
-                    ? 'bg-indigo-50/60 border border-indigo-100 text-slate-800'
-                    : 'bg-slate-50 border border-slate-200 text-slate-800'
+                    ? 'bg-slate-50/80 border border-slate-200/60 text-slate-800'
+                    : 'bg-white border border-slate-200/60 text-slate-800'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-1.5">
                     <div
-                      className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] ${
+                      className={`w-5 h-5 rounded-full flex items-center justify-center font-medium text-[9px] ${
                         msg.isPrivateStaffNote
-                          ? 'bg-amber-200 text-amber-900'
+                          ? 'bg-amber-200/70 text-amber-900'
                           : 'bg-slate-200 text-slate-700'
                       }`}
                     >
                       {msg.authorName.charAt(0)}
                     </div>
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-medium text-slate-900 text-xs">
                       {msg.authorName}
                     </span>
                     <span
-                      className={`px-1.5 py-0.2 rounded text-[10px] uppercase font-bold tracking-wider ${
+                      className={`px-1.5 py-0.2 rounded text-[9px] font-medium tracking-wide ${
                         msg.authorRole === UserRole.REQUESTER
                           ? 'bg-slate-100 text-slate-600'
                           : msg.authorRole === UserRole.AGENT
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-purple-100 text-purple-800'
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'bg-purple-50 text-purple-700'
                       }`}
                     >
                       {msg.authorRole}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
                     {msg.isPrivateStaffNote && (
-                      <span className="inline-flex items-center gap-1 font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded text-[10px]">
+                      <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-100/70 px-1.5 py-0.2 rounded">
                         <Lock className="w-2.5 h-2.5" />
-                        Private Staff Note
+                        Internal
                       </span>
                     )}
                     <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 </div>
 
-                <p className="whitespace-pre-wrap leading-relaxed text-slate-700 pl-8">
+                <p className="whitespace-pre-wrap leading-relaxed text-slate-700 pl-6.5 text-[11px]">
                   {msg.content}
                 </p>
               </div>
@@ -149,22 +149,22 @@ export const ActivityThread: React.FC<ActivityThreadProps> = ({
       </div>
 
       {/* Input composer */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-slate-200 bg-slate-50/50">
+      <form onSubmit={handleSubmit} className="p-3 border-t border-slate-100 bg-slate-50/40">
         {/* Toggle between Public and Staff Note (only for Staff) */}
         {isStaff && (
-          <div className="flex items-center gap-4 mb-2.5 text-xs">
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-700">
+          <div className="flex items-center gap-4 mb-2 text-xs">
+            <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-slate-900 text-[11px]">
               <input
                 type="radio"
                 name="noteType"
                 checked={!isPrivateStaffNote}
                 onChange={() => setIsPrivateStaffNote(false)}
-                className="text-indigo-600 focus:ring-indigo-500"
+                className="text-slate-900 focus:ring-slate-400"
               />
-              <span>Public Requester Reply</span>
+              <span>Public Reply</span>
             </label>
 
-            <label className="flex items-center gap-1.5 cursor-pointer text-amber-800 font-medium">
+            <label className="flex items-center gap-1.5 cursor-pointer text-amber-800 text-[11px] font-medium">
               <input
                 type="radio"
                 name="noteType"
@@ -173,8 +173,8 @@ export const ActivityThread: React.FC<ActivityThreadProps> = ({
                 className="text-amber-600 focus:ring-amber-500"
               />
               <span className="flex items-center gap-1">
-                <Lock className="w-3 h-3 text-amber-600" />
-                Private Staff Note (Hidden from requester)
+                <Lock className="w-2.5 h-2.5 text-amber-600" />
+                Staff Note (Private)
               </span>
             </label>
           </div>
@@ -188,27 +188,27 @@ export const ActivityThread: React.FC<ActivityThreadProps> = ({
             disabled={disabled}
             placeholder={
               isPrivateStaffNote
-                ? 'Add internal staff investigation note (private to agents/managers)...'
+                ? 'Add internal investigation note...'
                 : 'Type a reply to the requester...'
             }
-            className={`w-full text-xs rounded-lg p-2.5 pr-20 border focus:outline-none transition-all ${
+            className={`w-full text-xs rounded-lg p-2.5 pr-18 border focus:outline-none transition-colors ${
               isPrivateStaffNote
-                ? 'border-amber-300 bg-amber-50/30 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20'
-                : 'border-slate-300 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20'
+                ? 'border-amber-200 bg-amber-50/20 focus:border-amber-400'
+                : 'border-slate-200 bg-white focus:border-slate-800'
             }`}
           />
 
           <button
             type="submit"
             disabled={!content.trim() || disabled}
-            className={`absolute right-2 bottom-2.5 px-3 py-1.5 rounded-md text-xs font-semibold text-white flex items-center gap-1 shadow-xs transition-colors disabled:opacity-40 ${
+            className={`absolute right-2 bottom-2 px-2.5 py-1 rounded-md text-xs font-medium text-white flex items-center gap-1 transition-colors disabled:opacity-40 cursor-pointer ${
               isPrivateStaffNote
-                ? 'bg-amber-700 hover:bg-amber-800'
-                : 'bg-indigo-600 hover:bg-indigo-700'
+                ? 'bg-amber-800 hover:bg-amber-900'
+                : 'bg-slate-900 hover:bg-slate-800'
             }`}
           >
             <span>Send</span>
-            <Send className="w-3 h-3" />
+            <Send className="w-2.5 h-2.5" />
           </button>
         </div>
       </form>

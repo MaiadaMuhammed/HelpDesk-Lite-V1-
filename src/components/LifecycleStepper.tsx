@@ -62,26 +62,27 @@ export const LifecycleStepper: React.FC<LifecycleStepperProps> = ({
   const currentIndex = STATES_ORDER.findIndex((s) => s.status === currentStatus);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-sm font-semibold tracking-wider text-slate-500 uppercase">
-            HDL-06 Finite State Machine (5-State FSM)
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Strict sequential lifecycle with single ownership and terminal lock
-          </p>
-        </div>
+    <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-2xs">
+      <div className="flex items-center justify-between mb-3.5">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Current State:</span>
-          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-900 text-white shadow-xs">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+            Lifecycle Sequence
+          </span>
+          <span className="text-slate-300">•</span>
+          <span className="text-xs text-slate-500">
+            5-State Finite State Machine
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-slate-400">Current:</span>
+          <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-900 text-white">
             {currentStatus}
           </span>
         </div>
       </div>
 
       {/* Stepper Pipeline */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {STATES_ORDER.map((item, idx) => {
           const Icon = item.icon;
           const isCurrent = item.status === currentStatus;
@@ -92,14 +93,14 @@ export const LifecycleStepper: React.FC<LifecycleStepperProps> = ({
             <div
               key={item.status}
               id={`state-step-${item.status.toLowerCase()}`}
-              className={`relative rounded-lg p-3.5 border transition-all ${
+              className={`rounded-lg p-2.5 border transition-colors flex flex-col justify-between ${
                 isCurrent
-                  ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-500/20 shadow-xs'
+                  ? 'border-slate-900 bg-slate-50/80'
                   : isAllowedNext
-                  ? 'border-emerald-400 bg-emerald-50/40 hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer'
+                  ? 'border-emerald-300 bg-emerald-50/30 hover:border-emerald-500 hover:bg-emerald-50/60 cursor-pointer'
                   : isPast
-                  ? 'border-slate-200 bg-slate-50 text-slate-500'
-                  : 'border-slate-200 bg-white text-slate-400 opacity-75'
+                  ? 'border-slate-200/80 bg-slate-50/40 text-slate-600'
+                  : 'border-slate-200/50 bg-white text-slate-400 opacity-60'
               }`}
               onClick={() => {
                 if (isAllowedNext && !disabled) {
@@ -107,50 +108,50 @@ export const LifecycleStepper: React.FC<LifecycleStepperProps> = ({
                 }
               }}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span
+                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold ${
                       isCurrent
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-slate-900 text-white'
                         : isPast
                         ? 'bg-slate-200 text-slate-700'
                         : isAllowedNext
-                        ? 'bg-emerald-600 text-white animate-pulse'
+                        ? 'bg-emerald-600 text-white'
                         : 'bg-slate-100 text-slate-400'
                     }`}
                   >
                     {idx + 1}
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1">
-                      {item.label}
-                      <Icon className="w-3.5 h-3.5 inline text-slate-500" />
-                    </div>
-                    <div className="text-[10px] text-slate-500">{item.sub}</div>
-                  </div>
+                  </span>
+                  <Icon className={`w-3.5 h-3.5 ${isCurrent ? 'text-slate-900' : 'text-slate-400'}`} />
+                </div>
+                <div className="text-xs font-semibold text-slate-900">
+                  {item.label}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                  {item.sub}
                 </div>
               </div>
 
-              <div className="mt-3">
+              <div className="mt-2 pt-1.5 border-t border-slate-100">
                 {isCurrent && (
-                  <span className="inline-flex items-center text-[11px] font-medium text-indigo-700">
-                    Active State
+                  <span className="text-[10px] font-medium text-indigo-600">
+                    Active
                   </span>
                 )}
                 {isAllowedNext && (
                   <button
                     type="button"
                     disabled={disabled}
-                    className="w-full mt-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded flex items-center justify-center gap-1 shadow-xs transition-colors"
+                    className="w-full py-1 px-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-medium rounded flex items-center justify-center gap-1 transition-colors cursor-pointer"
                   >
                     <span>Transition</span>
-                    <ArrowRight className="w-3 h-3" />
+                    <ArrowRight className="w-2.5 h-2.5" />
                   </button>
                 )}
                 {!isCurrent && !isAllowedNext && (
                   <span className="text-[10px] text-slate-400">
-                    {idx < currentIndex ? 'Completed' : 'Locked'}
+                    {idx < currentIndex ? 'Done' : 'Locked'}
                   </span>
                 )}
               </div>
