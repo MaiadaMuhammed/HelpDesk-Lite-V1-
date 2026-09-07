@@ -43,16 +43,16 @@ import { NotificationTrigger, DeliveryStatus } from '../types/notification';
 // -----------------------------------------------------------------------------
 
 export const mockRequester: User = {
-  id: 'usr_req_01',
-  name: 'Sarah Jenkins',
-  email: 'sarah.jenkins@company.local',
+  id: 'usr_emp_maiada',
+  name: 'Maiada Muhammed',
+  email: 'maiada.muhammed@company.local',
   role: UserRole.REQUESTER,
 };
 
 export const mockAgent: User = {
-  id: 'usr_agent_01',
-  name: 'Alex Rivera',
-  email: 'alex.rivera@company.local',
+  id: 'usr_agt_eman',
+  name: 'Eman Mostafa',
+  email: 'eman.mostafa@support.company.local',
   role: UserRole.AGENT,
 };
 
@@ -64,9 +64,9 @@ export const mockAgentTwo: User = {
 };
 
 export const mockManager: User = {
-  id: 'usr_mgr_01',
-  name: 'Elena Rostova',
-  email: 'elena.rostova@company.local',
+  id: 'usr_mgr_huda',
+  name: 'Huda Tarek',
+  email: 'huda.tarek@management.company.local',
   role: UserRole.MANAGER,
 };
 

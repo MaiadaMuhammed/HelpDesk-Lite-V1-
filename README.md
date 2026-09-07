@@ -19,11 +19,13 @@ HelpDesk Lite is built for internal IT and customer support operations. The appl
 - **Terminal State Lock**: `CLOSED` is an immutable terminal state. Any further mutation or reassignment is strictly prevented.
 - **Single-Agent Ownership**: Guarantees that only one assigned agent owns an active ticket at any given time, avoiding concurrent collision.
 
-### 2. Role-Based Access Control (RBAC)
-- **Role Switcher**: Switch between active user personas on the fly to simulate and verify permissions:
-  - **Requester** (`Sarah Jenkins`): Submit tickets, add discussion messages, verify solutions, and approve closure or request reopens.
-  - **Support Agents** (`Alex Rivera`, `Marcus Vance`): Claim tickets from pool, transition states, resolve issues, and acknowledge status change alerts.
-  - **Manager** (`Elena Rostova`): Oversee triage queue, view team SLA/MTTR metrics, force-reassign tickets, and override state transitions.
+### 2. Dedicated User Profiles & Authentication Gateway (Login & Sign Up)
+- **Login & Sign Up at App Launch**: The application launches into a dedicated Authentication Gateway offering 1-click official profile entry, standard credential sign-in, and a full sign-up form for new team members.
+- **Three Official Preconfigured Profiles**:
+  1. **Employee (Requester)**: `Maiada Muhammed` (`maiada.muhammed@company.local`) — Submit IT/HR/Facilities tickets, participate in discussions, upload attachments, and verify solutions.
+  2. **Support Specialist (Agent)**: `Eman Mostafa` (`eman.mostafa@support.company.local`) — Claim tickets from the triage pool, transition states (`ASSIGNED` $\rightarrow$ `IN_PROGRESS` $\rightarrow$ `RESOLVED`), post private staff notes, and acknowledge alerts.
+  3. **Operations Manager (Manager)**: `Huda Tarek` (`huda.tarek@management.company.local`) — Full queue oversight, force reassignments, SLA breach monitoring, MTTR metrics, and transition overrides.
+- **Dynamic Profile Switcher & Sign Out**: Seamlessly switch between Maiada, Eman, Huda, or newly signed-up accounts from the header capsule or sign out at any time to return to the gateway.
 
 ### 3. Outbound Notification Dispatcher & Agent Acknowledgment
 - **Automated Transparency Dispatches**: Automatically generates and dispatches simulated email notifications on key lifecycle events:

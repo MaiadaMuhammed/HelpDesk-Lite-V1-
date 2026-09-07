@@ -79,7 +79,20 @@ import {
   Download,
   Bell,
   CheckCheck,
+  LogOut,
+  User as UserIcon,
 } from 'lucide-react';
+import { AuthGateway } from './components/AuthGateway';
+import {
+  UserProfile,
+  getActiveAuthUser,
+  setActiveAuthUser,
+  getStoredProfiles,
+  PROFILE_MAIADA_EMPLOYEE,
+  PROFILE_EMAN_SUPPORT,
+  PROFILE_HUDA_MANAGER,
+  getInitials,
+} from './services/authService';
 
 const RAW_INITIAL_SEED_TICKETS: Ticket[] = [
   {
@@ -229,7 +242,7 @@ const RAW_INITIAL_SEED_TICKETS: Ticket[] = [
         action: AuditAction.ASSIGNMENT_CHANGE,
         fromState: TicketStatus.NEW,
         toState: TicketStatus.ASSIGNED,
-        reason: 'Assigned to Alex Rivera for badge fulfillment',
+        reason: 'Assigned to Eman Mostafa for badge fulfillment',
         timestamp: new Date(Date.now() - 7200000).toISOString(),
       },
     ],
@@ -279,7 +292,11 @@ const INITIAL_SEED_TICKETS: Ticket[] = RAW_INITIAL_SEED_TICKETS.map((t) => ({
 }));
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User>(mockAgent);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getActiveAuthUser());
+  const [availableProfiles, setAvailableProfiles] = useState<UserProfile[]>(() => getStoredProfiles());
+
+  const effectiveUser: User = currentUser || PROFILE_MAIADA_EMPLOYEE;
+
   const [tickets, setTickets] = useState<Ticket[]>(INITIAL_SEED_TICKETS);
   const [selectedTicketId, setSelectedTicketId] = useState<string>(INITIAL_SEED_TICKETS[0].id);
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
@@ -329,7 +346,7 @@ export default function App() {
     resetTicket,
   } = useTicketLifecycle({
     initialTicket: activeTicket,
-    currentUser,
+    currentUser: effectiveUser,
     onTransitionSuccess: (updatedTicket, auditEntry) => {
       let newNotifs: DispatchedNotification[] = [];
 
@@ -339,7 +356,7 @@ export default function App() {
             updatedTicket,
             auditEntry.fromState,
             auditEntry.toState,
-            currentUser,
+            effectiveUser,
             auditEntry.reason
           );
         }
@@ -349,7 +366,7 @@ export default function App() {
           updatedTicket.assignedToId
             ? { id: updatedTicket.assignedToId, name: updatedTicket.assignedToName || '' }
             : null,
-          currentUser,
+          effectiveUser,
           auditEntry.reason
         );
       }
@@ -579,12 +596,44 @@ export default function App() {
     (n) => !n.isRead && n.trigger === NotificationTrigger.STATUS_CHANGED
   ).length;
 
+  const handleSignOut = () => {
+    setActiveAuthUser(null);
+    setCurrentUser(null);
+  };
+
+  const handleSwitchProfile = (profileId: string) => {
+    const target = availableProfiles.find((p) => p.id === profileId);
+    if (target) {
+      setActiveAuthUser(target);
+      setCurrentUser(target);
+      clearError();
+    }
+  };
+
+  const availableSupportAgents = [
+    ...availableProfiles.filter((p) => p.role === UserRole.AGENT),
+    mockAgentTwo,
+  ].filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i);
+
   // Filtered tickets
   const filteredTickets = tickets.filter((t) => {
     if (categoryFilter !== 'ALL' && t.category !== categoryFilter) return false;
     if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
     return true;
   });
+
+  // If no user is authenticated, render the AuthGateway login / sign-up screen at the first of the app
+  if (!currentUser) {
+    return (
+      <AuthGateway
+        onLoginSuccess={(user) => {
+          setActiveAuthUser(user);
+          setCurrentUser(user);
+          setAvailableProfiles(getStoredProfiles());
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col antialiased">
@@ -610,49 +659,88 @@ export default function App() {
             </div>
           </div>
 
-          {/* Role Switcher & New Ticket Button */}
-          <div className="flex items-center gap-3">
-            {/* Active User Simulator */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-1 text-xs">
-              <span className="text-[11px] font-medium text-slate-500 pl-1 hidden md:inline">
-                Simulate Actor:
-              </span>
-              <select
-                value={currentUser.id}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === mockRequester.id) setCurrentUser(mockRequester);
-                  else if (val === mockAgent.id) setCurrentUser(mockAgent);
-                  else if (val === mockAgentTwo.id) setCurrentUser(mockAgentTwo);
-                  else if (val === mockManager.id) setCurrentUser(mockManager);
-                  clearError();
-                }}
-                className="bg-white border border-slate-300 rounded px-2 py-1 font-semibold text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          {/* Authenticated Profile Switcher & New Ticket Button */}
+          <div className="flex items-center gap-2.5">
+            {/* Active User Card & Switcher */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-2xs">
+              <div
+                className={`w-7 h-7 rounded-lg ${
+                  currentUser.avatarColor || 'bg-indigo-600 text-white'
+                } flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs`}
               >
-                <option value={mockAgent.id}>Alex Rivera (Agent)</option>
-                <option value={mockAgentTwo.id}>Marcus Vance (Agent)</option>
-                <option value={mockRequester.id}>Sarah Jenkins (Requester)</option>
-                <option value={mockManager.id}>Elena Rostova (Manager)</option>
-              </select>
+                {getInitials(currentUser.name)}
+              </div>
 
-              <span
-                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                  currentUser.role === UserRole.REQUESTER
-                    ? 'bg-slate-200 text-slate-700'
-                    : currentUser.role === UserRole.AGENT
-                    ? 'bg-blue-100 text-blue-800'
-                    : 'bg-purple-100 text-purple-800'
-                }`}
+              <div className="flex flex-col text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-xs text-slate-900 leading-tight">
+                    {currentUser.name}
+                  </span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase tracking-wider ${
+                      currentUser.role === UserRole.REQUESTER
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : currentUser.role === UserRole.AGENT
+                        ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                        : 'bg-purple-100 text-purple-800 border border-purple-200'
+                    }`}
+                  >
+                    {currentUser.role === UserRole.REQUESTER
+                      ? 'Employee'
+                      : currentUser.role === UserRole.AGENT
+                      ? 'Support'
+                      : 'Manager'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-500 leading-tight truncate max-w-[130px] hidden sm:inline">
+                  {currentUser.department || currentUser.email}
+                </span>
+              </div>
+
+              {/* Profile Switcher Dropdown */}
+              <div className="pl-1 border-l border-slate-200 ml-1">
+                <select
+                  value={currentUser.id}
+                  onChange={(e) => handleSwitchProfile(e.target.value)}
+                  title="Switch between the 3 profiles or custom accounts"
+                  className="bg-white border border-slate-300 rounded px-1.5 py-1 font-semibold text-slate-800 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                >
+                  <optgroup label="Official Profiles">
+                    <option value={PROFILE_MAIADA_EMPLOYEE.id}>Maiada Muhammed (Employee)</option>
+                    <option value={PROFILE_EMAN_SUPPORT.id}>Eman Mostafa (Support)</option>
+                    <option value={PROFILE_HUDA_MANAGER.id}>Huda Tarek (Manager)</option>
+                  </optgroup>
+                  {availableProfiles.filter((p) => !p.isPredefined).length > 0 && (
+                    <optgroup label="Custom Profiles">
+                      {availableProfiles
+                        .filter((p) => !p.isPredefined)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.role})
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
+              {/* Sign Out Button */}
+              <button
+                type="button"
+                id="btn-header-signout"
+                onClick={handleSignOut}
+                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer ml-0.5"
+                title="Sign Out & Return to Login / Sign Up screen"
               >
-                {currentUser.role}
-              </span>
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
 
             <button
               type="button"
               id="btn-new-ticket"
               onClick={() => setIsSubmissionModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Ticket</span>
@@ -1010,17 +1098,21 @@ export default function App() {
                           const val = e.target.value;
                           if (!val) {
                             assignToAgent(null, 'Unassigned ticket back to pool');
-                          } else if (val === mockAgent.id) {
-                            assignToAgent({ id: mockAgent.id, name: mockAgent.name });
-                          } else if (val === mockAgentTwo.id) {
-                            assignToAgent({ id: mockAgentTwo.id, name: mockAgentTwo.name });
+                          } else {
+                            const selectedAgent = availableSupportAgents.find((a) => a.id === val);
+                            if (selectedAgent) {
+                              assignToAgent({ id: selectedAgent.id, name: selectedAgent.name });
+                            }
                           }
                         }}
-                        className="w-full bg-white border border-slate-300 rounded p-1.5 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full bg-white border border-slate-300 rounded p-1.5 font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                       >
                         <option value="">-- Unassigned (Triage Pool) --</option>
-                        <option value={mockAgent.id}>Alex Rivera (Support Agent)</option>
-                        <option value={mockAgentTwo.id}>Marcus Vance (Support Agent)</option>
+                        {availableSupportAgents.map((agt) => (
+                          <option key={agt.id} value={agt.id}>
+                            {agt.name} ({agt.role === UserRole.AGENT ? 'Support' : agt.role})
+                          </option>
+                        ))}
                       </select>
                     ) : (
                       <div className="font-semibold text-slate-800">
